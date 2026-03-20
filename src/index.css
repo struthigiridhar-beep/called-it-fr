@@ -2,95 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Background levels */
+    --bg-0: 24 15% 5.5%;
+    --bg-1: 24 12% 8%;
+    --bg-2: 26 13% 10.4%;
+    --bg-3: 17 10% 13.9%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Borders */
+    --b-0: 24 14% 14.5%;
+    --b-1: 26 14% 19.2%;
+    --b-2: 27 14% 25.5%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    /* Text */
+    --t-0: 34 30% 89%;
+    --t-1: 27 11% 56%;
+    --t-2: 30 12% 32%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* YES (blue) */
+    --yes: 213 38% 63%;
+    --yes-bg: 207 39% 9%;
+    --yes-border: 214 41% 20%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* NO (red-orange) */
+    --no: 14 47% 57%;
+    --no-bg: 13 36% 10%;
+    --no-border: 13 36% 20%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Coins/gold */
+    --coin: 42 50% 58%;
+    --coin-bg: 42 56% 7%;
+    --coin-border: 38 54% 14%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Success green */
+    --success: 112 33% 58%;
+    --success-bg: 112 44% 7%;
+    --success-border: 106 40% 21%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Shadcn mappings */
+    --background: var(--bg-0);
+    --foreground: var(--t-0);
+    --card: var(--bg-1);
+    --card-foreground: var(--t-0);
+    --popover: var(--bg-2);
+    --popover-foreground: var(--t-0);
+    --primary: var(--yes);
+    --primary-foreground: 0 0% 100%;
+    --secondary: var(--bg-3);
+    --secondary-foreground: var(--t-0);
+    --muted: var(--bg-2);
+    --muted-foreground: var(--t-1);
+    --accent: var(--bg-3);
+    --accent-foreground: var(--t-0);
+    --destructive: var(--no);
+    --destructive-foreground: 0 0% 100%;
+    --border: var(--b-0);
+    --input: var(--b-1);
+    --ring: var(--yes);
+    --radius: 12px;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: var(--bg-1);
+    --sidebar-foreground: var(--t-0);
+    --sidebar-primary: var(--yes);
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: var(--bg-2);
+    --sidebar-accent-foreground: var(--t-0);
+    --sidebar-border: var(--b-0);
+    --sidebar-ring: var(--yes);
   }
 }
 
@@ -100,6 +79,13 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   }
+}
+
+/* Monospace utility for numbers */
+.font-mono-num {
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }
