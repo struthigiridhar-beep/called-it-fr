@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import MarketCard from "@/components/MarketCard";
 import BetSheet from "@/components/BetSheet";
+import OddsBar from "@/components/OddsBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,16 +18,17 @@ export default function JoinGroup() {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get("ref");
   const navigate = useNavigate();
-  const { user, signInWithEmail, signUpWithEmail } = useAuth();
+  const { user, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
 
   const [step, setStep] = useState<Step>("preview");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(true);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Bet state for referral
+  // Bet state
   const [betOpen, setBetOpen] = useState(false);
   const [betSide, setBetSide] = useState<Side>("yes");
   const [betAmount, setBetAmount] = useState(0);
@@ -42,7 +44,7 @@ export default function JoinGroup() {
     enabled: !!groupId,
   });
 
-  // Fetch inviter info via invite code
+  // Fetch inviter info
   const { data: invite } = useQuery({
     queryKey: ["invite", inviteCode],
     queryFn: async () => {
@@ -56,7 +58,7 @@ export default function JoinGroup() {
     enabled: !!inviteCode,
   });
 
-  // Fetch group markets (first 3 open)
+  // Fetch group markets
   const { data: markets } = useQuery({
     queryKey: ["join-markets", groupId],
     queryFn: async () => {
@@ -140,113 +142,182 @@ export default function JoinGroup() {
   };
 
   const inviterName = (invite as any)?.users?.name;
+  const inviterColor = (invite as any)?.users?.avatar_color;
   const firstMarket = markets?.[0];
   const hiddenCount = Math.max(0, (markets?.length ?? 0) - 1);
   const fmTotal = (firstMarket?.yes_pool ?? 0) + (firstMarket?.no_pool ?? 0);
   const fmYesPct = fmTotal > 0 ? Math.round(((firstMarket?.yes_pool ?? 0) / fmTotal) * 100) : 50;
   const fmNoPct = 100 - fmYesPct;
+  const startingBalance = 500 - betAmount;
 
-  // ─── JOINED CONFIRMATION ───
-  if (step === "joined") {
+  // ─── SCREEN 4: JOINED — BET PLACED ───
+  if (step === "joined" && hasBet) {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-bg-0 px-5">
         <div className="w-full max-w-sm mx-auto flex-1 flex flex-col items-center justify-center space-y-6">
-          {hasBet ? (
-            <>
-              {/* Bet placed confirmation */}
-              <div className="text-center space-y-2">
-                <h1 className="text-2xl font-bold text-t-0">Bet placed.</h1>
-                <p className="text-t-1 text-sm">
-                  <span className={betSide === "yes" ? "text-yes font-semibold" : "text-no font-semibold"}>
-                    {betSide.toUpperCase()}
-                  </span>
-                  {" · "}
-                  <span className="font-mono-num text-coin">{betAmount}</span> coins. They'll see it.
-                </p>
-                <p className="text-t-2 text-xs">Everyone will.</p>
-              </div>
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold text-t-0">Bet placed.</h1>
+            <p className="text-t-1 text-sm">
+              <span className={betSide === "yes" ? "text-yes font-semibold" : "text-no font-semibold"}>
+                {betSide.toUpperCase()}
+              </span>
+              {" · "}
+              <span className="font-mono-num">{betAmount}</span> coins. They'll see it.
+            </p>
+            <p className="text-t-2 text-sm">Everyone will.</p>
+          </div>
 
-              {/* Starting balance */}
-              <div className="w-full rounded-card border border-coin-border bg-coin-bg p-4 flex items-center justify-between">
-                <span className="text-coin text-sm font-medium">Your starting balance</span>
-                <span className="font-mono-num text-coin font-bold">
-                  {(100 - betAmount > 0 ? 100 - betAmount : 0) + 400} coins
-                </span>
-              </div>
+          {/* Starting balance */}
+          <div className="w-full rounded-card border border-coin-border bg-coin-bg px-4 py-3 flex items-center justify-between">
+            <span className="text-coin text-sm font-medium">Your starting balance</span>
+            <span className="font-mono-num text-coin font-bold text-lg">
+              {startingBalance} <span className="text-sm font-normal">coins</span>
+            </span>
+          </div>
 
-              {/* Now start your own */}
-              <div className="w-full rounded-card border border-no-border bg-no-bg p-4 space-y-1">
-                <p className="text-no font-semibold text-sm">Now start your own</p>
-                <p className="text-t-1 text-xs">
-                  Create a bet, send the link to your people. They'll come in to prove you wrong.
-                </p>
-              </div>
+          {/* Now start your own */}
+          <div className="w-full rounded-card border border-coin-border bg-coin-bg p-4 space-y-1">
+            <p className="text-success font-semibold text-sm">Now start your own</p>
+            <p className="text-t-1 text-xs leading-relaxed">
+              Create a bet, send the link to your people. They'll come in to prove you wrong.
+            </p>
+          </div>
 
-              <Button
-                onClick={() => navigate(`/group/${groupId}`)}
-                className="w-full h-12 rounded-button bg-success text-white hover:bg-success/90 active:scale-[0.97] transition-all font-semibold"
-              >
-                Create a market
-              </Button>
+          <Button
+            onClick={() => navigate(`/group/${groupId}`)}
+            className="w-full h-12 rounded-button bg-success text-bg-0 hover:bg-success/90 active:scale-[0.97] transition-all font-semibold text-base"
+          >
+            Create a market
+          </Button>
 
-              <button
-                onClick={() => navigate(`/group/${groupId}`)}
-                className="block w-full text-center text-sm text-t-2 hover:text-t-1 transition-colors"
-              >
-                Browse all markets
-              </button>
-            </>
-          ) : (
-            <>
-              {/* You're in confirmation */}
-              <div className="mx-auto h-16 w-16 rounded-card border border-b-1 bg-bg-1 flex items-center justify-center">
-                <span className="text-xl font-bold text-t-0">CI</span>
-              </div>
-
-              <div className="text-center space-y-2">
-                <h1 className="text-2xl font-bold text-t-0">You're in.</h1>
-                <p className="text-t-1 text-sm">
-                  Your bet is live. Now wait for your friends to disagree with you loudly and publicly.
-                </p>
-              </div>
-
-              {inviterName && (
-                <p className="text-center text-xs text-t-2">
-                  {inviterName} invited you — they earn <span className="font-mono-num text-coin">50</span> coins each time you bet
-                </p>
-              )}
-
-              <div className="w-full rounded-card border border-coin-border bg-coin-bg p-4 text-left space-y-1">
-                <p className="text-coin font-semibold text-sm">Add to homescreen</p>
-                <p className="text-t-1 text-xs">
-                  Markets move fast. Add Called It to your homescreen so you never miss a verdict.
-                </p>
-              </div>
-
-              <Button
-                onClick={() => navigate(`/group/${groupId}`)}
-                className="w-full h-12 rounded-button bg-success text-white hover:bg-success/90 active:scale-[0.97] transition-all font-semibold"
-              >
-                See my markets
-              </Button>
-
-              <button
-                onClick={() => navigate(`/group/${groupId}`)}
-                className="block w-full text-center text-sm text-t-2 hover:text-t-1 transition-colors"
-              >
-                Not now
-              </button>
-            </>
-          )}
+          <button
+            onClick={() => navigate(`/group/${groupId}`)}
+            className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-1 text-sm font-medium hover:text-t-0 transition-colors"
+          >
+            Browse all markets
+          </button>
         </div>
       </div>
     );
   }
 
-  // ─── AUTH SCREEN ───
+  // ─── SCREEN 3: JOINED — NO BET ───
+  if (step === "joined") {
+    return (
+      <div className="flex min-h-[100dvh] flex-col bg-bg-0 px-5">
+        <div className="w-full max-w-sm mx-auto flex-1 flex flex-col items-center pt-14 space-y-5">
+          {/* Success banner */}
+          <div className="w-full rounded-card border border-success-border bg-success-bg p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-success flex items-center justify-center shrink-0">
+              <svg className="h-5 w-5 text-bg-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-success font-semibold text-sm">You're in {group?.name}.</p>
+              {inviterName && (
+                <p className="text-coin text-xs">
+                  {inviterName} gets 50 coins for the invite
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Featured market with "ABOUT YOU" badge */}
+          {firstMarket && (
+            <div className="w-full space-y-3">
+              <div className="rounded-card border border-coin-border bg-coin-bg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-coin" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-coin">
+                    There's a market about you
+                  </span>
+                </div>
+
+                <p className="text-t-0 font-semibold text-[15px] leading-snug">
+                  {firstMarket.question}
+                </p>
+
+                <OddsBar yesPool={firstMarket.yes_pool} noPool={firstMarket.no_pool} />
+
+                <div className="flex items-center justify-between text-[11px] text-t-2">
+                  <span className="font-mono-num text-yes font-semibold">{fmYesPct}% YES</span>
+                  <span className="font-mono-num">
+                    {fmTotal.toLocaleString()} coins · {/* bets count */}
+                  </span>
+                  <span className="font-mono-num text-no font-semibold">{fmNoPct}% NO</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setBetSide("yes"); setBetOpen(true); }}
+                    className="h-12 rounded-button bg-yes-bg border border-yes-border text-yes font-semibold text-sm hover:bg-yes/10 active:scale-[0.97] transition-all leading-tight"
+                  >
+                    YES — they're right
+                  </button>
+                  <button
+                    onClick={() => { setBetSide("no"); setBetOpen(true); }}
+                    className="h-12 rounded-button bg-no-bg border border-no-border text-no font-semibold text-sm hover:bg-no/10 active:scale-[0.97] transition-all leading-tight"
+                  >
+                    NO — prove them wrong
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Referral info */}
+          {inviterName && (
+            <div className="w-full rounded-card border border-b-1 bg-bg-1 p-4 flex items-center gap-3">
+              <div
+                className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold text-t-0 shrink-0"
+                style={{ backgroundColor: inviterColor ?? "hsl(var(--yes))" }}
+              >
+                {inviterName.slice(0, 2).toUpperCase()}
+              </div>
+              <p className="text-t-1 text-xs leading-relaxed flex-1">
+                {inviterName} invited you. He earns 50 coins every time you place a bet.
+              </p>
+              <span className="font-mono-num text-coin font-bold text-sm shrink-0">+50 c</span>
+            </div>
+          )}
+
+          <p className="text-center text-t-2 text-xs">
+            You start with 500 coins. Use them wisely.
+          </p>
+
+          {/* Bottom CTA */}
+          <div className="flex-1" />
+          <button
+            onClick={() => navigate(`/group/${groupId}`)}
+            className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-1 text-sm font-medium hover:text-t-0 transition-colors mb-10"
+          >
+            See all markets first
+          </button>
+        </div>
+
+        {/* Bet drawer for post-join betting */}
+        {firstMarket && (
+          <BetSheet
+            open={betOpen}
+            onOpenChange={setBetOpen}
+            initialSide={betSide}
+            question={firstMarket.question}
+            yesPct={fmYesPct}
+            noPct={fmNoPct}
+            onConfirm={(side, amount) => {
+              handleBetConfirm(side, amount);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ─── SCREEN 2: AUTH ───
   if (step === "auth") {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center px-5 bg-bg-0">
+      <div className="flex min-h-[100dvh] flex-col items-start justify-start px-5 pt-16 bg-bg-0">
         <div className="w-full max-w-sm space-y-6">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-t-0">One tap to join.</h1>
@@ -255,7 +326,38 @@ export default function JoinGroup() {
             </p>
           </div>
 
+          {/* Google OAuth */}
+          <button
+            onClick={() => signInWithGoogle()}
+            className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-0 font-semibold text-sm flex items-center justify-center gap-3 hover:bg-bg-2 active:scale-[0.97] transition-all"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Continue with Google
+          </button>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-b-0" />
+            <span className="text-t-2 text-xs">or</span>
+            <div className="flex-1 h-px bg-b-0" />
+          </div>
+
+          {/* Email form */}
           <form onSubmit={handleAuth} className="space-y-3">
+            {isSignUp && (
+              <Input
+                type="text"
+                placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
+              />
+            )}
             <Input
               type="email"
               placeholder="Email address"
@@ -264,20 +366,22 @@ export default function JoinGroup() {
               required
               className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
             />
-            <Input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
-            />
+            {!isSignUp && (
+              <Input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
+              />
+            )}
             {authError && <p className="text-sm text-no">{authError}</p>}
             <Button
               type="submit"
               disabled={authLoading}
-              className="w-full h-12 rounded-button bg-yes text-white hover:bg-yes/90 active:scale-[0.97] transition-all font-semibold"
+              className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-0 hover:bg-bg-2 active:scale-[0.97] transition-all font-semibold"
             >
               {authLoading ? "…" : isSignUp ? "Join with email" : "Sign in"}
             </Button>
@@ -298,7 +402,7 @@ export default function JoinGroup() {
     );
   }
 
-  // ─── GROUP PREVIEW ───
+  // ─── SCREEN 1: GROUP PREVIEW ───
   return (
     <div className="flex min-h-[100dvh] flex-col bg-bg-0 px-5 py-10">
       <div className="w-full max-w-sm mx-auto space-y-6">
@@ -313,7 +417,7 @@ export default function JoinGroup() {
             {inviterName && (
               <div
                 className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold text-t-0 shrink-0"
-                style={{ backgroundColor: (invite as any)?.users?.avatar_color ?? "hsl(var(--yes))" }}
+                style={{ backgroundColor: inviterColor ?? "hsl(var(--yes))" }}
               >
                 {inviterName.slice(0, 2).toUpperCase()}
               </div>
@@ -343,19 +447,25 @@ export default function JoinGroup() {
           What's live in this group
         </p>
 
-        {/* First market */}
+        {/* First market with "About you" badge */}
         {firstMarket ? (
-          <MarketCard
-            question={firstMarket.question}
-            category={firstMarket.category}
-            yesPool={firstMarket.yes_pool}
-            noPool={firstMarket.no_pool}
-            deadline={firstMarket.deadline}
-            onYes={() => { setBetSide("yes"); setBetOpen(true); }}
-            onNo={() => { setBetSide("no"); setBetOpen(true); }}
-            yesLabel="YES — join to bet"
-            noLabel="NO — join to bet"
-          />
+          <div className="relative">
+            {/* "About you" floating badge */}
+            <div className="absolute -top-2 right-3 z-10 bg-bg-2 border border-b-1 text-t-1 text-[10px] font-semibold px-2.5 py-1 rounded-pill">
+              About you
+            </div>
+            <MarketCard
+              question={firstMarket.question}
+              category={firstMarket.category}
+              yesPool={firstMarket.yes_pool}
+              noPool={firstMarket.no_pool}
+              deadline={firstMarket.deadline}
+              onYes={() => { setBetSide("yes"); setBetOpen(true); }}
+              onNo={() => { setBetSide("no"); setBetOpen(true); }}
+              yesLabel="YES — join to bet"
+              noLabel="NO — join to bet"
+            />
+          </div>
         ) : (
           <div className="rounded-card border border-b-1 bg-bg-1 p-4 space-y-3">
             <Skeleton className="h-5 w-full bg-bg-2 animate-pulse" />
@@ -374,9 +484,7 @@ export default function JoinGroup() {
             </div>
             <div className="absolute inset-0 flex items-center justify-between px-4">
               <div className="flex items-center gap-2 text-t-2">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
+                <span className="text-base">🔒</span>
                 <span className="text-xs">{hiddenCount} more markets hidden until you join</span>
               </div>
               <span className="font-mono-num text-t-2 text-xs">+{hiddenCount}</span>
@@ -407,13 +515,13 @@ export default function JoinGroup() {
         {/* Join button */}
         <Button
           onClick={() => setStep("auth")}
-          className="w-full h-12 rounded-button bg-yes text-white hover:bg-yes/90 active:scale-[0.97] transition-all font-semibold"
+          className="w-full h-12 rounded-button bg-bg-1 border border-b-1 text-t-0 hover:bg-bg-2 active:scale-[0.97] transition-all font-semibold text-base"
         >
           Join {group?.name ?? "group"}
         </Button>
       </div>
 
-      {/* Bet drawer (opens before auth, redirects to auth on confirm) */}
+      {/* Bet drawer */}
       {firstMarket && (
         <BetSheet
           open={betOpen}
