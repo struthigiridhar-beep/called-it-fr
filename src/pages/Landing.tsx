@@ -5,11 +5,12 @@ import { useFeaturedMarket } from "@/hooks/useFeaturedMarket";
 import MarketCard from "@/components/MarketCard";
 import BetSheet from "@/components/BetSheet";
 import OddsBar from "@/components/OddsBar";
+import HomescreenNudge, { shouldShowNudge } from "@/components/HomescreenNudge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Side = "yes" | "no";
-type Step = "browse" | "betting" | "create-bet" | "auth" | "bet-placed" | "market-live";
+type Step = "browse" | "betting" | "create-bet" | "auth" | "homescreen-nudge" | "bet-placed" | "market-live";
 type AuthMode = "signup" | "signin";
 
 interface PendingBet {
@@ -46,18 +47,20 @@ export default function Landing() {
   useEffect(() => {
     if (!user) return;
     if (step === "auth") {
-      if (pendingBet) {
+      if (shouldShowNudge()) {
+        setStep("homescreen-nudge");
+      } else if (pendingBet) {
         setStep("bet-placed");
       } else if (pendingMarket) {
         setStep("market-live");
       } else {
-        // no pending action, just go home
+        navigate("/home", { replace: true });
       }
     }
   }, [user]);
 
   // Redirect authenticated users with no pending actions
-  if (user && step !== "bet-placed" && step !== "market-live" && step !== "auth") {
+  if (user && !["bet-placed", "market-live", "auth", "homescreen-nudge"].includes(step)) {
     return <Navigate to="/home" replace />;
   }
 
@@ -127,6 +130,23 @@ export default function Landing() {
       </div>
     </div>
   );
+
+  // ─── HOMESCREEN NUDGE ───
+  if (step === "homescreen-nudge") {
+    return (
+      <HomescreenNudge
+        onContinue={() => {
+          if (pendingBet) {
+            setStep("bet-placed");
+          } else if (pendingMarket) {
+            setStep("market-live");
+          } else {
+            navigate("/home", { replace: true });
+          }
+        }}
+      />
+    );
+  }
 
   // ─── BET PLACED (Screen 5a) ───
   if (step === "bet-placed" && pendingBet) {

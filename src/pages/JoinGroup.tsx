@@ -6,11 +6,12 @@ import { useAuth } from "@/hooks/useAuth";
 import MarketCard from "@/components/MarketCard";
 import BetSheet from "@/components/BetSheet";
 import OddsBar from "@/components/OddsBar";
+import HomescreenNudge, { shouldShowNudge } from "@/components/HomescreenNudge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Side = "yes" | "no";
-type Step = "preview" | "auth" | "joined";
+type Step = "preview" | "auth" | "homescreen-nudge" | "joined";
 type AuthMode = "signup" | "signin";
 
 const PENDING_BET_KEY = "calledit_pending_bet";
@@ -189,7 +190,11 @@ export default function JoinGroup() {
       }
 
       clearPendingBet();
-      setStep("joined");
+      if (shouldShowNudge()) {
+        setStep("homescreen-nudge");
+      } else {
+        setStep("joined");
+      }
     })();
   }, [user, groupId]);
 
@@ -235,6 +240,15 @@ export default function JoinGroup() {
   const fmTotal = (firstMarket?.yes_pool ?? 0) + (firstMarket?.no_pool ?? 0);
   const fmYesPct = fmTotal > 0 ? Math.round(((firstMarket?.yes_pool ?? 0) / fmTotal) * 100) : 50;
   const fmNoPct = 100 - fmYesPct;
+
+  // ─── HOMESCREEN NUDGE ───
+  if (step === "homescreen-nudge") {
+    return (
+      <HomescreenNudge
+        onContinue={() => setStep("joined")}
+      />
+    );
+  }
 
   // ─── SCREEN 4: JOINED ───
   if (step === "joined") {
