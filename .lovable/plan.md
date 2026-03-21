@@ -1,90 +1,44 @@
 
 
-## Build /group/:groupId — Markets, Feed, Board Tabs
+## Fix Infinite Recursion in RLS Policies
 
-### Overview
-Replace the placeholder `Group.tsx` with a full tabbed layout. The Markets tab is the primary deliverable with two sections (group markets + public markets), a redesigned bet sheet with slider/presets/potential-return, position display, and judge banner. Feed and Board remain stubs.
-
-### Files to modify/create
-
-**1. `src/pages/Group.tsx`** — Full rewrite
-- Fetch group info, user membership (coins), all markets for this group, user's bets, verdicts where user is judge
-- Tab bar: Markets | Feed | Board (styled like screenshot — underline active tab)
-- Default to Markets tab, render content inline (not via Outlet/child routes)
-- Bottom nav bar (same as Home)
-
-**2. `src/components/BetSheet.tsx`** — Major rewrite
-- New props: `minBet`, `userCoins`, `groupName`, `totalPool`, `sidePool`
-- Presets: `[minBet, minBet*2, minBet*4, "all in"]` — hide any preset > userCoins
-- Slider: range input from minBet to userCoins
-- Large centered amount display (like screenshot: "480 coins")
-- Potential return row: `~${Math.round(amount / sidePool * totalPool)} c est.`
-- Min bet warning: if amount < minBet, show amber warning + "Snap to minimum" button
-- Confirm button: "Confirm YES · 480 c"
-- Footer: "[X] coins in the bank"
-- `onConfirm` callback receives side + amount
-
-**3. `src/pages/GroupMarkets.tsx`** — Full rewrite (rendered inside Group.tsx, not as route)
-- Actually this logic lives directly in Group.tsx Markets tab content
-
-### Markets Tab Data Flow
-
+### Root Cause
+The `group_members` table has a SELECT policy for authenticated users that references itself:
+```sql
+group_id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = auth.uid())
 ```
-Queries (all via useQuery):
-1. group: groups.select("id, name").eq("id", groupId)
-2. membership: group_members.select("coins, xp").eq("group_id", groupId).eq("user_id", uid)
-3. markets: markets.select("*").eq("group_id", groupId).eq("status", "open") + markets.select("*").eq("is_public", true).eq("status", "open")
-4. userBets: bets.select("*").eq("user_id", uid)
-5. verdicts: verdicts.select("*, markets!inner(group_id, status)").eq("judge_id", uid) — for judge banner
-6. userData: users.select("first_bet_at").eq("id", uid)
+This causes **infinite recursion** (error `42P17`), which cascades to every other table whose RLS policies reference `group_members` (markets, bets, roasts, verdicts, disputes).
+
+### Fix — 2 Steps
+
+**Step 1: Create a SECURITY DEFINER function** to check group membership without triggering RLS:
+
+```sql
+CREATE OR REPLACE FUNCTION public.user_group_ids(_user_id uuid)
+RETURNS SETOF uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT group_id FROM public.group_members WHERE user_id = _user_id;
+$$;
 ```
 
-### Markets Tab Layout
+**Step 2: Replace all self-referencing policies** that query `group_members` in their USING/WITH CHECK expressions. Replace the subquery `(SELECT group_id FROM group_members WHERE user_id = auth.uid())` with `public.user_group_ids(auth.uid())` everywhere:
 
-**Judge Banner** (if user has pending verdict on a closed market in this group):
-- Amber card with initials avatar, "You're the judge", "Tap to commit verdict · Xh left", market question
+Tables affected:
+- **group_members** — "Members can view group members" SELECT → `group_id IN (SELECT public.user_group_ids(auth.uid()))`
+- **groups** — "Members can view their groups" SELECT → use `user_group_ids`
+- **markets** — "Group members can view markets" SELECT → use `user_group_ids` AND add `OR is_public = true`
+- **markets** — "Group members can create markets" INSERT → use `user_group_ids`
+- **bets** — "Users can view bets in their groups" SELECT → use `user_group_ids`
+- **roasts** — both SELECT and INSERT policies → use `user_group_ids`
+- **verdicts** — SELECT policy → use `user_group_ids`
+- **disputes** — both SELECT and INSERT policies → use `user_group_ids`
 
-**Section: YOUR GROUP**
-- Header: "YOUR GROUP"
-- List markets where `is_public = false`, ordered by `created_at desc`
-- Each card:
-  - Capsule row: group name pill (`bg-[#272220] border-[#38302A] text-[#9A8E84]` + neutral dot)
-  - Question text
-  - Deadline inline as muted text: "closes Jun 30"
-  - OddsBar
-  - Stats row: YES% left, pool + deadline center, NO% right
-  - YES / NO buttons
-  - If user has bet on this market: position row "Your position: YES · 200 c" + estimated return
+This also fixes the public markets issue: the markets SELECT policy will become `is_public = true OR group_id IN (SELECT public.user_group_ids(auth.uid()))`.
 
-**Section: PUBLIC · EVERYONE CAN BET**
-- Header row: "PUBLIC · EVERYONE CAN BET" + "Global" pill
-- Pin user's first-bet market at top if `first_bet_at` is set and they bet on a public market
-  - That card gets extra pill: "Your first bet" in yes-blue style
-- List remaining public markets ordered by `(yes_pool + no_pool) desc`
-- Each card: "Public bet" pill (blue style `bg-[#0E1820] border-[#1E3048] text-[#7B9EC8]`)
-- Same card structure as group markets
-
-### Bet Confirmation Logic (on confirm)
-1. Insert into `bets` table (market_id, user_id, side, amount)
-2. Update market: increment `yes_pool` or `no_pool` by amount
-3. Update `group_members`: deduct coins — `newBalance = Math.max(0, currentBalance - amount)`
-4. Insert notification for other group members
-5. Invalidate queries, close sheet
-6. Toast confirmation
-
-### Coin Safety (enforced in BetSheet)
-- Slider max = userCoins (never hardcoded)
-- Presets filtered: only show if `preset <= userCoins`
-- "all in" always shown, sets amount to userCoins
-- Confirm handler clamps: `Math.max(0, coins - amount)`
-
-### Routing Change in `App.tsx`
-- Keep `/group/:groupId` route pointing to `Group` component
-- Remove child routes for markets/feed/board (tabs are handled internally now)
-
-### Technical Details
-- No new DB migrations needed
-- No new components — MarketCard will not be reused; cards are rendered inline in Group.tsx for the custom capsule/position rows
-- OddsBar component reused as-is
-- Existing BetSheet rewritten with new props interface (backward-compatible by making new props optional with defaults for referral flow usage)
+### No code changes needed
+The frontend queries are correct. Once RLS stops returning 500 errors, everything will work.
 
