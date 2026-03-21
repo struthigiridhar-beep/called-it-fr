@@ -14,6 +14,8 @@ interface BetSheetProps {
   onOpenChange: (open: boolean) => void;
   initialSide: Side;
   question: string;
+  yesPct: number;
+  noPct: number;
   onConfirm: (side: Side, amount: number) => void;
 }
 
@@ -24,16 +26,17 @@ export default function BetSheet({
   onOpenChange,
   initialSide,
   question,
+  yesPct,
+  noPct,
   onConfirm,
 }: BetSheetProps) {
   const [side, setSide] = useState<Side>(initialSide);
-  const [amount, setAmount] = useState<number>(50);
+  const [amount, setAmount] = useState<number>(25);
 
-  // Reset when side changes from parent
   const handleOpenChange = (next: boolean) => {
     if (next) {
       setSide(initialSide);
-      setAmount(50);
+      setAmount(25);
     }
     onOpenChange(next);
   };
@@ -42,65 +45,62 @@ export default function BetSheet({
     <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerContent className="bg-bg-1 border-b-1 pb-8">
         <DrawerHeader className="text-left px-5 pb-1">
-          <DrawerTitle className="text-t-0 text-base">Place your bet</DrawerTitle>
-          <DrawerDescription className="text-t-2 text-xs line-clamp-2">
-            {question}
-          </DrawerDescription>
+          <DrawerTitle className="text-[10px] font-semibold uppercase tracking-wider text-t-2">
+            Place your bet
+          </DrawerTitle>
+          <DrawerDescription className="sr-only">{question}</DrawerDescription>
         </DrawerHeader>
 
         <div className="px-5 space-y-5">
-          {/* Side toggle */}
-          <div className="grid grid-cols-2 gap-2 p-1 rounded-button bg-bg-2">
+          {/* Side toggle with odds */}
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setSide("yes")}
-              className={`h-9 rounded-button text-sm font-semibold transition-all ${
+              className={`h-11 rounded-button text-sm font-semibold transition-all ${
                 side === "yes"
                   ? "bg-yes-bg border border-yes-border text-yes"
-                  : "text-t-2 hover:text-t-1"
+                  : "bg-bg-2 border border-b-0 text-t-2 hover:text-t-1"
               }`}
             >
-              YES
+              YES — <span className="font-mono-num">{yesPct}%</span>
             </button>
             <button
               onClick={() => setSide("no")}
-              className={`h-9 rounded-button text-sm font-semibold transition-all ${
+              className={`h-11 rounded-button text-sm font-semibold transition-all ${
                 side === "no"
                   ? "bg-no-bg border border-no-border text-no"
-                  : "text-t-2 hover:text-t-1"
+                  : "bg-bg-2 border border-b-0 text-t-2 hover:text-t-1"
               }`}
             >
-              NO
+              NO — <span className="font-mono-num">{noPct}%</span>
             </button>
           </div>
 
           {/* Amount presets */}
-          <div className="space-y-2">
-            <span className="text-xs text-t-2">Amount</span>
-            <div className="grid grid-cols-4 gap-2">
-              {PRESETS.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setAmount(p)}
-                  className={`h-10 rounded-button text-sm font-mono-num font-semibold transition-all ${
-                    amount === p
-                      ? "bg-coin-bg border border-coin-border text-coin"
-                      : "bg-bg-2 border border-b-0 text-t-1 hover:text-t-0"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
+          <div className="grid grid-cols-4 gap-2">
+            {PRESETS.map((p) => (
               <button
-                onClick={() => setAmount(-1)}
-                className={`h-10 rounded-button text-sm font-semibold transition-all ${
-                  amount === -1
+                key={p}
+                onClick={() => setAmount(p)}
+                className={`h-11 rounded-button text-sm font-mono-num font-semibold transition-all ${
+                  amount === p
                     ? "bg-coin-bg border border-coin-border text-coin"
                     : "bg-bg-2 border border-b-0 text-t-1 hover:text-t-0"
                 }`}
               >
-                All in
+                {p}
               </button>
-            </div>
+            ))}
+            <button
+              onClick={() => setAmount(-1)}
+              className={`h-11 rounded-button text-xs font-mono-num font-semibold transition-all leading-tight ${
+                amount === -1
+                  ? "bg-coin-bg border border-coin-border text-coin"
+                  : "bg-bg-2 border border-b-0 text-t-1 hover:text-t-0"
+              }`}
+            >
+              all{"\n"}in
+            </button>
           </div>
 
           {/* Confirm */}
@@ -112,9 +112,14 @@ export default function BetSheet({
                 : "bg-no text-white hover:bg-no/90"
             }`}
           >
-            Bet {amount === -1 ? "all" : amount} coins on{" "}
+            Bet <span className="font-mono-num">{amount === -1 ? "all" : amount}</span> coins on{" "}
             <span className="uppercase">{side}</span>
           </button>
+
+          {/* Helper text */}
+          <p className="text-center text-[11px] text-t-2">
+            No account needed to vote — save it after
+          </p>
         </div>
       </DrawerContent>
     </Drawer>
