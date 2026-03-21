@@ -21,7 +21,7 @@ const PROMPTS = [
 ];
 
 export default function Landing() {
-  const { user, signInWithEmail, signUpWithEmail } = useAuth();
+  const { user, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
   const { data: market, isLoading } = useFeaturedMarket();
   const navigate = useNavigate();
 
