@@ -514,7 +514,7 @@ export default function JoinGroup() {
 
         {/* Join button */}
         <Button
-          onClick={() => setStep("auth")}
+          onClick={() => setStep(user ? "joined" : "auth")}
           className="w-full h-12 rounded-button bg-bg-1 border border-b-1 text-t-0 hover:bg-bg-2 active:scale-[0.97] transition-all font-semibold text-base"
         >
           Join {group?.name ?? "group"}
@@ -527,7 +527,7 @@ export default function JoinGroup() {
           open={betOpen}
           onOpenChange={(o) => {
             setBetOpen(o);
-            if (!o && hasBet) setStep("auth");
+            if (!o && hasBet) setStep(user ? "joined" : "auth");
           }}
           initialSide={betSide}
           question={firstMarket.question}
@@ -535,7 +535,7 @@ export default function JoinGroup() {
           noPct={fmNoPct}
           onConfirm={(side, amount) => {
             handleBetConfirm(side, amount);
-            setStep("auth");
+            setStep(user ? "joined" : "auth");
           }}
         />
       )}
