@@ -9,7 +9,7 @@ import Landing from "@/pages/Landing";
 import JoinGroup from "@/pages/JoinGroup";
 import Home from "@/pages/Home";
 import Group from "@/pages/Group";
-import GroupMarkets from "@/pages/GroupMarkets";
+
 import Profile from "@/pages/Profile";
 import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
