@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Side = "yes" | "no";
-type Step = "preview" | "auth" | "magic-sent" | "joined";
+type Step = "preview" | "auth" | "joined";
+type AuthMode = "signup" | "signin";
 
 const PENDING_BET_KEY = "calledit_pending_bet";
 
@@ -46,10 +47,12 @@ export default function JoinGroup() {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get("ref");
   const navigate = useNavigate();
-  const { user, signInWithOtp } = useAuth();
+  const { user, signUp, signIn } = useAuth();
 
   const [step, setStep] = useState<Step>("preview");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authMode, setAuthMode] = useState<AuthMode>("signup");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -198,12 +201,12 @@ export default function JoinGroup() {
     setStep("auth");
   };
 
-  const handleSendMagicLink = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     setAuthLoading(true);
     try {
-      // Save pending bet to localStorage before redirect
+      // Save pending bet to localStorage before auth
       if (pendingBet && groupId && firstMarket) {
         savePendingBet({
           groupId,
@@ -212,9 +215,12 @@ export default function JoinGroup() {
           amount: pendingBet.amount,
         });
       }
-      const redirectUrl = `${window.location.origin}/join/${groupId}${inviteCode ? `?ref=${inviteCode}` : ""}`;
-      await signInWithOtp(email, redirectUrl);
-      setStep("magic-sent");
+      if (authMode === "signup") {
+        await signUp(email, password);
+      } else {
+        await signIn(email, password);
+      }
+      // useEffect above handles step transition once user is set
     } catch (err: any) {
       setAuthError(err.message);
     } finally {
@@ -316,34 +322,7 @@ export default function JoinGroup() {
     );
   }
 
-  // ─── SCREEN 3b: MAGIC LINK SENT ───
-  if (step === "magic-sent") {
-    return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center px-5 bg-bg-0">
-        <div className="w-full max-w-sm space-y-6 text-center">
-          <div className="mx-auto h-16 w-16 rounded-card border border-b-1 bg-bg-1 flex items-center justify-center">
-            <span className="text-2xl">✉️</span>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-t-0">Check your inbox.</h1>
-            <p className="text-t-1 text-sm">
-              We sent a magic link to <span className="font-semibold text-t-0">{email}</span>.
-              Tap it to join {group?.name ?? "the group"}.
-            </p>
-          </div>
-          <p className="text-t-2 text-xs">
-            Didn't get it? Check spam, or{" "}
-            <button onClick={() => setStep("auth")} className="text-yes hover:underline">
-              try again
-            </button>
-            .
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── SCREEN 3a: AUTH (magic link) ───
+  // ─── SCREEN 3: AUTH (email/password) ───
   if (step === "auth") {
     return (
       <div className="flex min-h-[100dvh] flex-col items-start justify-start px-5 pt-14 bg-bg-0">
@@ -371,11 +350,13 @@ export default function JoinGroup() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-t-0">One step to get in.</h1>
             <p className="text-t-1 text-sm">
-              Enter your email — we'll send a magic link. No password, no forms.
+              {authMode === "signup"
+                ? "Create an account to join the group."
+                : "Sign in to your account."}
             </p>
           </div>
 
-          <form onSubmit={handleSendMagicLink} className="space-y-3">
+          <form onSubmit={handleAuth} className="space-y-3">
             <Input
               type="email"
               placeholder="Email address"
@@ -384,18 +365,45 @@ export default function JoinGroup() {
               required
               className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
             />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
+            />
             {authError && <p className="text-sm text-no">{authError}</p>}
             <button
               type="submit"
               disabled={authLoading}
               className="w-full h-12 rounded-button bg-yes text-white hover:bg-yes/90 active:scale-[0.97] transition-all font-semibold text-sm disabled:opacity-50"
             >
-              {authLoading ? "Sending…" : "Send magic link"}
+              {authLoading
+                ? "Loading…"
+                : authMode === "signup"
+                  ? "Create account"
+                  : "Sign in"}
             </button>
           </form>
 
           <p className="text-center text-[11px] text-t-2">
-            No spam. Just your friends roasting you when you're wrong.
+            {authMode === "signup" ? (
+              <>
+                Already have an account?{" "}
+                <button onClick={() => { setAuthMode("signin"); setAuthError(""); }} className="text-yes hover:underline">
+                  Sign in
+                </button>
+              </>
+            ) : (
+              <>
+                Don't have an account?{" "}
+                <button onClick={() => { setAuthMode("signup"); setAuthError(""); }} className="text-yes hover:underline">
+                  Sign up
+                </button>
+              </>
+            )}
           </p>
         </div>
       </div>
