@@ -7,10 +7,10 @@ import BetSheet from "@/components/BetSheet";
 import OddsBar from "@/components/OddsBar";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle } from "lucide-react";
 
 type Side = "yes" | "no";
-type Step = "browse" | "betting" | "create-bet" | "auth" | "magic-sent" | "bet-placed" | "market-live";
+type Step = "browse" | "betting" | "create-bet" | "auth" | "bet-placed" | "market-live";
+type AuthMode = "signup" | "signin";
 
 interface PendingBet {
   side: Side;
@@ -25,7 +25,7 @@ interface PendingMarket {
 }
 
 export default function Landing() {
-  const { user, signInWithOtp } = useAuth();
+  const { user, signUp, signIn } = useAuth();
   const { data: market, isLoading } = useFeaturedMarket();
   const navigate = useNavigate();
 
@@ -36,37 +36,28 @@ export default function Landing() {
   const [customQuestion, setCustomQuestion] = useState("");
 
   // Auth
+  const [authMode, setAuthMode] = useState<AuthMode>("signup");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
-  // On mount: if user is authenticated, check localStorage for pending actions
+  // On auth: if user becomes authenticated while on auth step, advance
   useEffect(() => {
     if (!user) return;
-
-    const betRaw = localStorage.getItem("calledit_pending_bet");
-    const marketRaw = localStorage.getItem("calledit_pending_market");
-
-    if (betRaw) {
-      try {
-        setPendingBet(JSON.parse(betRaw));
-        localStorage.removeItem("calledit_pending_bet");
+    if (step === "auth") {
+      if (pendingBet) {
         setStep("bet-placed");
-        return;
-      } catch {}
-    }
-    if (marketRaw) {
-      try {
-        setPendingMarket(JSON.parse(marketRaw));
-        localStorage.removeItem("calledit_pending_market");
+      } else if (pendingMarket) {
         setStep("market-live");
-        return;
-      } catch {}
+      } else {
+        // no pending action, just go home
+      }
     }
   }, [user]);
 
   // Redirect authenticated users with no pending actions
-  if (user && step !== "bet-placed" && step !== "market-live") {
+  if (user && step !== "bet-placed" && step !== "market-live" && step !== "auth") {
     return <Navigate to="/home" replace />;
   }
 
@@ -101,19 +92,17 @@ export default function Landing() {
     setStep("auth");
   };
 
-  const handleSendMagicLink = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     setAuthLoading(true);
     try {
-      // Persist before sending
-      if (pendingBet) {
-        localStorage.setItem("calledit_pending_bet", JSON.stringify(pendingBet));
-      } else if (pendingMarket) {
-        localStorage.setItem("calledit_pending_market", JSON.stringify(pendingMarket));
+      if (authMode === "signup") {
+        await signUp(email, password);
+      } else {
+        await signIn(email, password);
       }
-      await signInWithOtp(email, window.location.origin);
-      setStep("magic-sent");
+      // useEffect above will handle step transition once user is set
     } catch (err: any) {
       setAuthError(err.message);
     } finally {
@@ -200,7 +189,6 @@ export default function Landing() {
         <div className="w-full max-w-sm mx-auto space-y-6">
           <h1 className="text-3xl font-bold text-t-0">You're live.</h1>
 
-          {/* Market card */}
           <div className="rounded-card border border-b-1 bg-bg-1 p-4 space-y-3">
             <p className="text-t-0 font-bold text-[15px] leading-snug">
               {pendingMarket.question}
@@ -208,13 +196,9 @@ export default function Landing() {
             <p className="text-t-1 text-sm leading-relaxed">
               Your market is live. Share the link — they have to join to see the odds.
             </p>
-
-            {/* Share URL */}
             <div className="rounded-button bg-bg-2 border border-b-0 px-3 py-2.5 text-xs font-mono-num text-t-2 truncate">
               {shareLink}
             </div>
-
-            {/* Share buttons */}
             <div className="flex gap-2">
               {["WhatsApp", "Copy link", "iMessage"].map((label) => (
                 <button
@@ -238,35 +222,6 @@ export default function Landing() {
           >
             See my markets
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── MAGIC SENT (Screen 4) ───
-  if (step === "magic-sent") {
-    return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center px-5 bg-bg-0">
-        <div className="w-full max-w-sm space-y-6 text-center">
-          <div className="mx-auto h-16 w-16 rounded-full border border-success-border bg-success-bg flex items-center justify-center">
-            <CheckCircle className="h-8 w-8 text-success" />
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-t-0">Check your email.</h1>
-            <p className="text-t-1 text-sm">
-              Tap the magic link and you're in — bet saved, coins credited, market live.
-            </p>
-          </div>
-
-          <div className="rounded-card border border-b-1 bg-bg-1 p-4 space-y-2 text-left">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-t-2">
-              While you wait
-            </p>
-            <p className="text-t-1 text-sm">
-              Share your link now. They need to join to see the odds.
-            </p>
-          </div>
         </div>
       </div>
     );
@@ -318,13 +273,13 @@ export default function Landing() {
               {isBetFlow ? "Save your bet." : "One step to go live."}
             </h1>
             <p className="text-t-1 text-sm">
-              {isBetFlow
-                ? "Enter your email — we'll send a magic link. No password."
-                : "Enter your email — we'll send a magic link instantly."}
+              {authMode === "signup"
+                ? "Create an account to lock it in."
+                : "Sign in to your account."}
             </p>
           </div>
 
-          <form onSubmit={handleSendMagicLink} className="space-y-3">
+          <form onSubmit={handleAuth} className="space-y-3">
             <Input
               type="email"
               placeholder="your@email.com"
@@ -333,30 +288,54 @@ export default function Landing() {
               required
               className="h-12 rounded-button bg-bg-2 border-b-0 text-t-0 placeholder:text-t-2"
             />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              className="h-12 rounded-button bg-bg-2 border-b-0 text-t-0 placeholder:text-t-2"
+            />
             {authError && <p className="text-sm text-no">{authError}</p>}
-            <p className="text-center text-[11px] text-t-2">
-              {isBetFlow ? "No spam. Ever." : "No spam. No password. Ever."}
-            </p>
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full h-12 rounded-button bg-yes text-white hover:bg-yes/90 active:scale-[0.97] transition-all font-semibold text-sm disabled:opacity-50"
+            >
+              {authLoading
+                ? "Loading…"
+                : authMode === "signup"
+                  ? "Create account"
+                  : "Sign in"}
+            </button>
           </form>
 
-          <div className="flex-1" />
+          <p className="text-center text-[11px] text-t-2">
+            {authMode === "signup" ? (
+              <>
+                Already have an account?{" "}
+                <button onClick={() => { setAuthMode("signin"); setAuthError(""); }} className="text-yes hover:underline">
+                  Sign in
+                </button>
+              </>
+            ) : (
+              <>
+                Don't have an account?{" "}
+                <button onClick={() => { setAuthMode("signup"); setAuthError(""); }} className="text-yes hover:underline">
+                  Sign up
+                </button>
+              </>
+            )}
+          </p>
 
-          {/* Fixed bottom CTA */}
-          <div className="pb-8">
-            <button
-              onClick={handleSendMagicLink as any}
-              disabled={authLoading || !email}
-              className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-0 text-sm font-semibold hover:bg-bg-2 active:scale-[0.97] transition-all disabled:opacity-50"
-            >
-              {authLoading ? "Sending…" : "Send magic link"}
-            </button>
-          </div>
+          <div className="flex-1" />
         </div>
       </div>
     );
   }
 
-  // ─── CREATE BET (Screen — inline, not a separate page) ───
+  // ─── CREATE BET ───
   if (step === "create-bet") {
     return (
       <div className="flex min-h-[100dvh] flex-col px-5 bg-bg-0 pt-14">

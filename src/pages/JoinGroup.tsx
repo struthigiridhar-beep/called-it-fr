@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Side = "yes" | "no";
-type Step = "preview" | "auth" | "magic-sent" | "joined";
+type Step = "preview" | "auth" | "joined";
+type AuthMode = "signup" | "signin";
 
 const PENDING_BET_KEY = "calledit_pending_bet";
 

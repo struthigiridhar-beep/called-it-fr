@@ -6,7 +6,8 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  signInWithOtp: (email: string, redirectTo?: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -31,11 +32,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithOtp = async (email: string, redirectTo?: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo ?? window.location.origin },
-    });
+  const signUp = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+  };
+
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   };
 
@@ -57,7 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         user: session?.user ?? null,
         loading,
-        signInWithOtp,
+        signUp,
+        signIn,
         signInWithGoogle,
         signOut,
       }}
