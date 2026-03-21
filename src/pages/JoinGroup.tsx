@@ -6,11 +6,12 @@ import { useAuth } from "@/hooks/useAuth";
 import MarketCard from "@/components/MarketCard";
 import BetSheet from "@/components/BetSheet";
 import OddsBar from "@/components/OddsBar";
+import HomescreenNudge, { shouldShowNudge } from "@/components/HomescreenNudge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Side = "yes" | "no";
-type Step = "preview" | "auth" | "joined";
+type Step = "preview" | "auth" | "homescreen-nudge" | "joined";
 type AuthMode = "signup" | "signin";
 
 const PENDING_BET_KEY = "calledit_pending_bet";
