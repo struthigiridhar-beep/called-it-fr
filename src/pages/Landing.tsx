@@ -262,35 +262,19 @@ export default function Landing() {
               required
               className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
             />
-            <Input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
-            />
             {authError && <p className="text-sm text-no">{authError}</p>}
             <Button
               type="submit"
               disabled={authLoading}
               className="w-full h-12 rounded-button bg-yes text-white hover:bg-yes/90 active:scale-[0.97] transition-all font-semibold"
             >
-              {authLoading ? "…" : isSignUp ? "Join with email" : "Sign in"}
+              {authLoading ? "Sending…" : "Send magic link"}
             </Button>
           </form>
 
           <p className="text-center text-[11px] text-t-2">
             No spam. Just your friends roasting you when you're wrong.
           </p>
-
-          <button
-            onClick={() => { setIsSignUp(!isSignUp); setAuthError(""); }}
-            className="block w-full text-center text-xs text-t-2 hover:text-t-1 transition-colors"
-          >
-            {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
-          </button>
         </div>
       </div>
     );
