@@ -2,7 +2,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
-import { Plus, LayoutGrid, Home as HomeIcon, Bell, User } from "lucide-react";
+import { Plus } from "lucide-react";
+import BottomNav from "@/components/BottomNav";
 import { useState } from "react";
 
 interface GroupCardData {
