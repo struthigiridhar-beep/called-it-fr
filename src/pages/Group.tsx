@@ -385,11 +385,20 @@ export default function Group() {
       <div className="flex-1 overflow-y-auto pb-28">
         {/* Tab bar */}
         <div className="sticky top-0 z-10 bg-bg-0 px-4 pt-4">
-          <div className="flex gap-6 border-b border-b-0">
+          {/* Coin balance row */}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-t-0">{group?.name ?? "Group"}</h2>
+            <div className="flex items-center gap-1.5 rounded-pill bg-coin-bg border border-coin-border px-3 py-1">
+              <span className="text-sm font-bold font-mono-num text-coin">{userCoins.toLocaleString()}</span>
+              <span className="text-xs text-coin">c</span>
+            </div>
+          </div>
+
+          <div className="flex gap-4 border-b border-b-0">
             {tabs.map((t) => (
               <button
                 key={t.key}
-                onClick={() => setTab(t.key)}
+                onClick={() => handleTabChange(t.key)}
                 className={`pb-2.5 text-sm font-semibold transition-colors ${
                   tab === t.key
                     ? "text-t-0 border-b-2 border-t-0"
@@ -399,6 +408,14 @@ export default function Group() {
                 {t.label}
               </button>
             ))}
+            {/* Create market button in tab bar */}
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="pb-2.5 text-sm font-semibold text-yes border-b-2 border-transparent ml-auto flex items-center gap-1"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Create
+            </button>
           </div>
         </div>
 
