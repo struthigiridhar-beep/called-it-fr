@@ -17,6 +17,8 @@ interface BetSheetProps {
   yesPct: number;
   noPct: number;
   onConfirm: (side: Side, amount: number) => void;
+  /** When true, changes header/CTA for the referral join flow */
+  referralMode?: boolean;
 }
 
 const PRESETS = [25, 50, 100];
@@ -29,6 +31,7 @@ export default function BetSheet({
   yesPct,
   noPct,
   onConfirm,
+  referralMode = false,
 }: BetSheetProps) {
   const [side, setSide] = useState<Side>(initialSide);
   const [amount, setAmount] = useState<number>(25);
@@ -41,12 +44,16 @@ export default function BetSheet({
     onOpenChange(next);
   };
 
+  const displayAmount = amount === -1 ? "all" : amount;
+
   return (
     <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerContent className="bg-bg-1 border-b-1 pb-8">
         <DrawerHeader className="text-left px-5 pb-1">
           <DrawerTitle className="text-[10px] font-semibold uppercase tracking-wider text-t-2">
-            Place your bet
+            {referralMode
+              ? `Bet on ${side.toUpperCase()} before joining`
+              : "Place your bet"}
           </DrawerTitle>
           <DrawerDescription className="sr-only">{question}</DrawerDescription>
         </DrawerHeader>
@@ -112,14 +119,25 @@ export default function BetSheet({
                 : "bg-no text-white hover:bg-no/90"
             }`}
           >
-            Bet <span className="font-mono-num">{amount === -1 ? "all" : amount}</span> coins on{" "}
-            <span className="uppercase">{side}</span>
+            {referralMode ? (
+              <>
+                Join + bet <span className="font-mono-num">{displayAmount}</span> coins on{" "}
+                <span className="uppercase">{side}</span>
+              </>
+            ) : (
+              <>
+                Bet <span className="font-mono-num">{displayAmount}</span> coins on{" "}
+                <span className="uppercase">{side}</span>
+              </>
+            )}
           </button>
 
           {/* Helper text */}
-          <p className="text-center text-[11px] text-t-2">
-            No account needed to vote — save it after
-          </p>
+          {!referralMode && (
+            <p className="text-center text-[11px] text-t-2">
+              No account needed to vote — save it after
+            </p>
+          )}
         </div>
       </DrawerContent>
     </Drawer>

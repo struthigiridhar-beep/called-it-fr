@@ -6,33 +6,58 @@ import { useAuth } from "@/hooks/useAuth";
 import MarketCard from "@/components/MarketCard";
 import BetSheet from "@/components/BetSheet";
 import OddsBar from "@/components/OddsBar";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Side = "yes" | "no";
-type Step = "preview" | "auth" | "joined";
+type Step = "preview" | "auth" | "magic-sent" | "joined";
+
+const PENDING_BET_KEY = "calledit_pending_bet";
+
+interface PendingBet {
+  groupId: string;
+  marketId: string;
+  side: Side;
+  amount: number;
+}
+
+function savePendingBet(bet: PendingBet) {
+  localStorage.setItem(PENDING_BET_KEY, JSON.stringify(bet));
+}
+
+function loadPendingBet(groupId: string): PendingBet | null {
+  try {
+    const raw = localStorage.getItem(PENDING_BET_KEY);
+    if (!raw) return null;
+    const bet = JSON.parse(raw) as PendingBet;
+    if (bet.groupId === groupId) return bet;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingBet() {
+  localStorage.removeItem(PENDING_BET_KEY);
+}
 
 export default function JoinGroup() {
   const { groupId } = useParams<{ groupId: string }>();
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get("ref");
   const navigate = useNavigate();
-  const { user, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
+  const { user, signInWithOtp } = useAuth();
 
   const [step, setStep] = useState<Step>("preview");
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(true);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
   // Bet state
   const [betOpen, setBetOpen] = useState(false);
   const [betSide, setBetSide] = useState<Side>("yes");
-  const [betAmount, setBetAmount] = useState(0);
-  const [hasBet, setHasBet] = useState(false);
+  const [pendingBet, setPendingBet] = useState<{ side: Side; amount: number } | null>(null);
+  const [joinProcessed, setJoinProcessed] = useState(false);
 
   // Fetch group
   const { data: group, isLoading: groupLoading } = useQuery({
@@ -100,13 +125,30 @@ export default function JoinGroup() {
     enabled: !!groupId,
   });
 
-  // Join group after auth
+  // On mount: check for pending bet from localStorage (magic link return)
   useEffect(() => {
-    if (!user || !groupId || step === "joined") return;
+    if (!groupId) return;
+    const saved = loadPendingBet(groupId);
+    if (saved) {
+      setPendingBet({ side: saved.side, amount: saved.amount });
+    }
+  }, [groupId]);
+
+  // Auto-join group when user becomes authenticated
+  useEffect(() => {
+    if (!user || !groupId || joinProcessed) return;
+    setJoinProcessed(true);
+
     (async () => {
+      // Join group
       await supabase
         .from("group_members")
-        .upsert({ user_id: user.id, group_id: groupId }, { onConflict: "user_id,group_id" });
+        .upsert(
+          { user_id: user.id, group_id: groupId, coins: 500 },
+          { onConflict: "user_id,group_id" }
+        );
+
+      // Credit inviter 50 coins
       if (invite) {
         await supabase.from("transactions").insert({
           user_id: (invite as any).created_by,
@@ -115,30 +157,69 @@ export default function JoinGroup() {
           reference_id: user.id,
         });
       }
+
+      // Place pending bet if exists
+      const saved = loadPendingBet(groupId);
+      const bet = saved ?? pendingBet;
+      const marketId = saved?.marketId ?? firstMarket?.id;
+
+      if (bet && marketId) {
+        await supabase.from("bets").insert({
+          user_id: user.id,
+          market_id: marketId,
+          side: bet.side,
+          amount: bet.amount,
+        });
+        // Update market pools optimistically
+        if (bet.side === "yes") {
+          await supabase
+            .from("markets")
+            .update({ yes_pool: (firstMarket?.yes_pool ?? 0) + bet.amount })
+            .eq("id", marketId);
+        } else {
+          await supabase
+            .from("markets")
+            .update({ no_pool: (firstMarket?.no_pool ?? 0) + bet.amount })
+            .eq("id", marketId);
+        }
+        setPendingBet(bet);
+      }
+
+      clearPendingBet();
       setStep("joined");
     })();
   }, [user, groupId]);
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleBetConfirm = (side: Side, amount: number) => {
+    const realAmount = amount === -1 ? 100 : amount;
+    const bet = { side, amount: realAmount };
+    setPendingBet(bet);
+    setBetOpen(false);
+    setStep("auth");
+  };
+
+  const handleSendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     setAuthLoading(true);
     try {
-      if (isSignUp) await signUpWithEmail(email, password);
-      else await signInWithEmail(email, password);
+      // Save pending bet to localStorage before redirect
+      if (pendingBet && groupId && firstMarket) {
+        savePendingBet({
+          groupId,
+          marketId: firstMarket.id,
+          side: pendingBet.side,
+          amount: pendingBet.amount,
+        });
+      }
+      const redirectUrl = `${window.location.origin}/join/${groupId}${inviteCode ? `?ref=${inviteCode}` : ""}`;
+      await signInWithOtp(email, redirectUrl);
+      setStep("magic-sent");
     } catch (err: any) {
       setAuthError(err.message);
     } finally {
       setAuthLoading(false);
     }
-  };
-
-  const handleBetConfirm = (side: Side, amount: number) => {
-    const realAmount = amount === -1 ? 100 : amount;
-    setBetSide(side);
-    setBetAmount(realAmount);
-    setHasBet(true);
-    setBetOpen(false);
   };
 
   const inviterName = (invite as any)?.users?.name;
@@ -148,64 +229,19 @@ export default function JoinGroup() {
   const fmTotal = (firstMarket?.yes_pool ?? 0) + (firstMarket?.no_pool ?? 0);
   const fmYesPct = fmTotal > 0 ? Math.round(((firstMarket?.yes_pool ?? 0) / fmTotal) * 100) : 50;
   const fmNoPct = 100 - fmYesPct;
-  const startingBalance = 500 - betAmount;
 
-  // ─── SCREEN 4: JOINED — BET PLACED ───
-  if (step === "joined" && hasBet) {
-    return (
-      <div className="flex min-h-[100dvh] flex-col bg-bg-0 px-5">
-        <div className="w-full max-w-sm mx-auto flex-1 flex flex-col items-center justify-center space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-t-0">Bet placed.</h1>
-            <p className="text-t-1 text-sm">
-              <span className={betSide === "yes" ? "text-yes font-semibold" : "text-no font-semibold"}>
-                {betSide.toUpperCase()}
-              </span>
-              {" · "}
-              <span className="font-mono-num">{betAmount}</span> coins. They'll see it.
-            </p>
-            <p className="text-t-2 text-sm">Everyone will.</p>
-          </div>
-
-          {/* Starting balance */}
-          <div className="w-full rounded-card border border-coin-border bg-coin-bg px-4 py-3 flex items-center justify-between">
-            <span className="text-coin text-sm font-medium">Your starting balance</span>
-            <span className="font-mono-num text-coin font-bold text-lg">
-              {startingBalance} <span className="text-sm font-normal">coins</span>
-            </span>
-          </div>
-
-          {/* Now start your own */}
-          <div className="w-full rounded-card border border-coin-border bg-coin-bg p-4 space-y-1">
-            <p className="text-success font-semibold text-sm">Now start your own</p>
-            <p className="text-t-1 text-xs leading-relaxed">
-              Create a bet, send the link to your people. They'll come in to prove you wrong.
-            </p>
-          </div>
-
-          <Button
-            onClick={() => navigate(`/group/${groupId}`)}
-            className="w-full h-12 rounded-button bg-success text-bg-0 hover:bg-success/90 active:scale-[0.97] transition-all font-semibold text-base"
-          >
-            Create a market
-          </Button>
-
-          <button
-            onClick={() => navigate(`/group/${groupId}`)}
-            className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-1 text-sm font-medium hover:text-t-0 transition-colors"
-          >
-            Browse all markets
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── SCREEN 3: JOINED — NO BET ───
+  // ─── SCREEN 4: JOINED ───
   if (step === "joined") {
+    const bet = pendingBet;
+    const updatedYes = (firstMarket?.yes_pool ?? 0) + (bet?.side === "yes" ? bet.amount : 0);
+    const updatedNo = (firstMarket?.no_pool ?? 0) + (bet?.side === "no" ? bet.amount : 0);
+    const updatedTotal = updatedYes + updatedNo;
+    const updatedYesPct = updatedTotal > 0 ? Math.round((updatedYes / updatedTotal) * 100) : 50;
+    const updatedNoPct = 100 - updatedYesPct;
+
     return (
-      <div className="flex min-h-[100dvh] flex-col bg-bg-0 px-5">
-        <div className="w-full max-w-sm mx-auto flex-1 flex flex-col items-center pt-14 space-y-5">
+      <div className="flex min-h-[100dvh] flex-col bg-bg-0 px-5 py-10">
+        <div className="w-full max-w-sm mx-auto space-y-5">
           {/* Success banner */}
           <div className="w-full rounded-card border border-success-border bg-success-bg p-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-success flex items-center justify-center shrink-0">
@@ -216,57 +252,40 @@ export default function JoinGroup() {
             <div>
               <p className="text-success font-semibold text-sm">You're in {group?.name}.</p>
               {inviterName && (
-                <p className="text-coin text-xs">
-                  {inviterName} gets 50 coins for the invite
-                </p>
+                <p className="text-coin text-xs">{inviterName} earns 50 coins for inviting you</p>
               )}
             </div>
           </div>
 
-          {/* Featured market with "ABOUT YOU" badge */}
-          {firstMarket && (
-            <div className="w-full space-y-3">
-              <div className="rounded-card border border-coin-border bg-coin-bg p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-coin" />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-coin">
-                    There's a market about you
-                  </span>
-                </div>
-
-                <p className="text-t-0 font-semibold text-[15px] leading-snug">
-                  {firstMarket.question}
-                </p>
-
-                <OddsBar yesPool={firstMarket.yes_pool} noPool={firstMarket.no_pool} />
-
-                <div className="flex items-center justify-between text-[11px] text-t-2">
-                  <span className="font-mono-num text-yes font-semibold">{fmYesPct}% YES</span>
-                  <span className="font-mono-num">
-                    {fmTotal.toLocaleString()} coins · {/* bets count */}
-                  </span>
-                  <span className="font-mono-num text-no font-semibold">{fmNoPct}% NO</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => { setBetSide("yes"); setBetOpen(true); }}
-                    className="h-12 rounded-button bg-yes-bg border border-yes-border text-yes font-semibold text-sm hover:bg-yes/10 active:scale-[0.97] transition-all leading-tight"
-                  >
-                    YES — they're right
-                  </button>
-                  <button
-                    onClick={() => { setBetSide("no"); setBetOpen(true); }}
-                    className="h-12 rounded-button bg-no-bg border border-no-border text-no font-semibold text-sm hover:bg-no/10 active:scale-[0.97] transition-all leading-tight"
-                  >
-                    NO — prove them wrong
-                  </button>
-                </div>
+          {/* YOUR BET IS LIVE card */}
+          {bet && firstMarket && (
+            <div className="rounded-card border border-b-1 bg-bg-1 p-4 space-y-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-success">
+                Your bet is live
+              </span>
+              <p className="text-t-0 font-semibold text-[15px] leading-snug">
+                {firstMarket.question}
+              </p>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-t-2">Your position:</span>
+                <span className={`font-semibold ${bet.side === "yes" ? "text-yes" : "text-no"}`}>
+                  {bet.side.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-t-2">Amount:</span>
+                <span className="font-mono-num text-coin font-semibold">{bet.amount} coins</span>
+              </div>
+              <OddsBar yesPool={updatedYes} noPool={updatedNo} />
+              <div className="flex items-center justify-between text-[11px] text-t-2">
+                <span className="font-mono-num text-yes font-semibold">{updatedYesPct}% YES</span>
+                <span className="font-mono-num">{updatedTotal.toLocaleString()} votes</span>
+                <span className="font-mono-num text-no font-semibold">{updatedNoPct}% NO</span>
               </div>
             </div>
           )}
 
-          {/* Referral info */}
+          {/* Inviter referral card */}
           {inviterName && (
             <div className="w-full rounded-card border border-b-1 bg-bg-1 p-4 flex items-center gap-3">
               <div
@@ -276,7 +295,7 @@ export default function JoinGroup() {
                 {inviterName.slice(0, 2).toUpperCase()}
               </div>
               <p className="text-t-1 text-xs leading-relaxed flex-1">
-                {inviterName} invited you. He earns 50 coins every time you place a bet.
+                {inviterName} invited you — they earn 50 coins each time you bet
               </p>
               <span className="font-mono-num text-coin font-bold text-sm shrink-0">+50 c</span>
             </div>
@@ -286,78 +305,77 @@ export default function JoinGroup() {
             You start with 500 coins. Use them wisely.
           </p>
 
-          {/* Bottom CTA */}
-          <div className="flex-1" />
           <button
             onClick={() => navigate(`/group/${groupId}`)}
-            className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-1 text-sm font-medium hover:text-t-0 transition-colors mb-10"
+            className="w-full h-12 rounded-button bg-bg-1 border border-b-1 text-t-0 text-sm font-semibold hover:bg-bg-2 active:scale-[0.97] transition-all"
           >
-            See all markets first
+            See all markets
           </button>
         </div>
-
-        {/* Bet drawer for post-join betting */}
-        {firstMarket && (
-          <BetSheet
-            open={betOpen}
-            onOpenChange={setBetOpen}
-            initialSide={betSide}
-            question={firstMarket.question}
-            yesPct={fmYesPct}
-            noPct={fmNoPct}
-            onConfirm={(side, amount) => {
-              handleBetConfirm(side, amount);
-            }}
-          />
-        )}
       </div>
     );
   }
 
-  // ─── SCREEN 2: AUTH ───
+  // ─── SCREEN 3b: MAGIC LINK SENT ───
+  if (step === "magic-sent") {
+    return (
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center px-5 bg-bg-0">
+        <div className="w-full max-w-sm space-y-6 text-center">
+          <div className="mx-auto h-16 w-16 rounded-card border border-b-1 bg-bg-1 flex items-center justify-center">
+            <span className="text-2xl">✉️</span>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-t-0">Check your inbox.</h1>
+            <p className="text-t-1 text-sm">
+              We sent a magic link to <span className="font-semibold text-t-0">{email}</span>.
+              Tap it to join {group?.name ?? "the group"}.
+            </p>
+          </div>
+          <p className="text-t-2 text-xs">
+            Didn't get it? Check spam, or{" "}
+            <button onClick={() => setStep("auth")} className="text-yes hover:underline">
+              try again
+            </button>
+            .
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── SCREEN 3a: AUTH (magic link) ───
   if (step === "auth") {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-start justify-start px-5 pt-16 bg-bg-0">
+      <div className="flex min-h-[100dvh] flex-col items-start justify-start px-5 pt-14 bg-bg-0">
         <div className="w-full max-w-sm space-y-6">
+          {/* Pending bet summary */}
+          {pendingBet && firstMarket && (
+            <div className="rounded-card border border-b-1 bg-bg-1 p-4 space-y-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-coin">
+                Your pending bet
+              </span>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-t-1 text-sm leading-snug flex-1">
+                  {firstMarket.question}
+                </p>
+                <div className="text-right shrink-0">
+                  <p className={`font-semibold text-sm ${pendingBet.side === "yes" ? "text-yes" : "text-no"}`}>
+                    {pendingBet.side.toUpperCase()}
+                  </p>
+                  <p className="font-mono-num text-t-2 text-xs">{pendingBet.amount} coins</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-t-0">One tap to join.</h1>
+            <h1 className="text-2xl font-bold text-t-0">One step to get in.</h1>
             <p className="text-t-1 text-sm">
-              Sign in to save your bets, track your coins, and let the group know you're in.
+              Enter your email — we'll send a magic link. No password, no forms.
             </p>
           </div>
 
-          {/* Google OAuth */}
-          <button
-            onClick={() => signInWithGoogle()}
-            className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-0 font-semibold text-sm flex items-center justify-center gap-3 hover:bg-bg-2 active:scale-[0.97] transition-all"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            Continue with Google
-          </button>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-b-0" />
-            <span className="text-t-2 text-xs">or</span>
-            <div className="flex-1 h-px bg-b-0" />
-          </div>
-
-          {/* Email form */}
-          <form onSubmit={handleAuth} className="space-y-3">
-            {isSignUp && (
-              <Input
-                type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
-              />
-            )}
+          <form onSubmit={handleSendMagicLink} className="space-y-3">
             <Input
               type="email"
               placeholder="Email address"
@@ -366,37 +384,19 @@ export default function JoinGroup() {
               required
               className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
             />
-            {!isSignUp && (
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
-              />
-            )}
             {authError && <p className="text-sm text-no">{authError}</p>}
-            <Button
+            <button
               type="submit"
               disabled={authLoading}
-              className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-0 hover:bg-bg-2 active:scale-[0.97] transition-all font-semibold"
+              className="w-full h-12 rounded-button bg-yes text-white hover:bg-yes/90 active:scale-[0.97] transition-all font-semibold text-sm disabled:opacity-50"
             >
-              {authLoading ? "…" : isSignUp ? "Join with email" : "Sign in"}
-            </Button>
+              {authLoading ? "Sending…" : "Send magic link"}
+            </button>
           </form>
 
           <p className="text-center text-[11px] text-t-2">
             No spam. Just your friends roasting you when you're wrong.
           </p>
-
-          <button
-            onClick={() => { setIsSignUp(!isSignUp); setAuthError(""); }}
-            className="block w-full text-center text-xs text-t-2 hover:text-t-1 transition-colors"
-          >
-            {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
-          </button>
         </div>
       </div>
     );
@@ -450,7 +450,6 @@ export default function JoinGroup() {
         {/* First market with "About you" badge */}
         {firstMarket ? (
           <div className="relative">
-            {/* "About you" floating badge */}
             <div className="absolute -top-2 right-3 z-10 bg-bg-2 border border-b-1 text-t-1 text-[10px] font-semibold px-2.5 py-1 rounded-pill">
               About you
             </div>
@@ -485,9 +484,8 @@ export default function JoinGroup() {
             <div className="absolute inset-0 flex items-center justify-between px-4">
               <div className="flex items-center gap-2 text-t-2">
                 <span className="text-base">🔒</span>
-                <span className="text-xs">{hiddenCount} more markets hidden until you join</span>
+                <span className="text-xs">{hiddenCount} more markets — join to unlock</span>
               </div>
-              <span className="font-mono-num text-t-2 text-xs">+{hiddenCount}</span>
             </div>
           </div>
         )}
@@ -507,36 +505,31 @@ export default function JoinGroup() {
               ))}
             </div>
             <span className="text-xs text-t-2">
-              {memberCount} already inside · betting live
+              {memberCount} already inside
             </span>
           </div>
         )}
 
         {/* Join button */}
-        <Button
+        <button
           onClick={() => setStep(user ? "joined" : "auth")}
           className="w-full h-12 rounded-button bg-bg-1 border border-b-1 text-t-0 hover:bg-bg-2 active:scale-[0.97] transition-all font-semibold text-base"
         >
           Join {group?.name ?? "group"}
-        </Button>
+        </button>
       </div>
 
       {/* Bet drawer */}
       {firstMarket && (
         <BetSheet
           open={betOpen}
-          onOpenChange={(o) => {
-            setBetOpen(o);
-            if (!o && hasBet) setStep(user ? "joined" : "auth");
-          }}
+          onOpenChange={setBetOpen}
           initialSide={betSide}
           question={firstMarket.question}
           yesPct={fmYesPct}
           noPct={fmNoPct}
-          onConfirm={(side, amount) => {
-            handleBetConfirm(side, amount);
-            setStep(user ? "joined" : "auth");
-          }}
+          onConfirm={handleBetConfirm}
+          referralMode
         />
       )}
     </div>
