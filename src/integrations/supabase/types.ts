@@ -495,7 +495,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      user_group_ids: { Args: { _user_id: string }; Returns: string[] }
     }
     Enums: {
       bet_side: "yes" | "no"
