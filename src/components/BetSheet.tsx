@@ -53,7 +53,7 @@ export default function BetSheet({
           <DrawerTitle className="text-[10px] font-semibold uppercase tracking-wider text-t-2">
             {referralMode
               ? `Bet on ${side.toUpperCase()} before joining`
-              : "Place your bet"}
+              : `How much on ${side.toUpperCase()}?`}
           </DrawerTitle>
           <DrawerDescription className="sr-only">{question}</DrawerDescription>
         </DrawerHeader>
