@@ -25,7 +25,7 @@ export function useFeaturedMarket() {
         .eq("is_pinned", true)
         .eq("status", "open")
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (pinned) return pinned as FeaturedMarket;
 
@@ -37,7 +37,7 @@ export function useFeaturedMarket() {
         .eq("status", "open")
         .order("yes_pool", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       return (data as FeaturedMarket) ?? null;
     },
