@@ -372,6 +372,14 @@ export default function Group() {
     { key: "board", label: "Board" },
   ];
 
+  const handleTabChange = (t: Tab) => {
+    if (t === "create") {
+      setCreateOpen(true);
+      return;
+    }
+    setTab(t);
+  };
+
   return (
     <div className="min-h-[100dvh] bg-bg-0 flex flex-col">
       <div className="flex-1 overflow-y-auto pb-28">
