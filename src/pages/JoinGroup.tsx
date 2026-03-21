@@ -341,7 +341,6 @@ export default function JoinGroup() {
   if (step === "auth") {
     const device = getDeviceInstructions();
     const showNudge = shouldShowNudge();
-    const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
     const dismissNudge = () => {
       localStorage.setItem("calledit_homescreen_dismissed", "true");
