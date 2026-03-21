@@ -7,9 +7,11 @@ import BottomNav from "@/components/BottomNav";
 import { format } from "date-fns";
 import OddsBar from "@/components/OddsBar";
 import BetSheet from "@/components/BetSheet";
+import CreateMarketSheet from "@/components/CreateMarketSheet";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
 
-type Tab = "markets" | "feed" | "board";
+type Tab = "markets" | "feed" | "board" | "create";
 type Side = "yes" | "no";
 
 interface MarketRow {
