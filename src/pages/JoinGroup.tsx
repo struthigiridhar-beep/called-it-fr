@@ -350,11 +350,13 @@ export default function JoinGroup() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-t-0">One step to get in.</h1>
             <p className="text-t-1 text-sm">
-              Enter your email — we'll send a magic link. No password, no forms.
+              {authMode === "signup"
+                ? "Create an account to join the group."
+                : "Sign in to your account."}
             </p>
           </div>
 
-          <form onSubmit={handleSendMagicLink} className="space-y-3">
+          <form onSubmit={handleAuth} className="space-y-3">
             <Input
               type="email"
               placeholder="Email address"
@@ -363,18 +365,45 @@ export default function JoinGroup() {
               required
               className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
             />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              className="h-12 rounded-button bg-bg-1 border-b-0 text-t-0 placeholder:text-t-2"
+            />
             {authError && <p className="text-sm text-no">{authError}</p>}
             <button
               type="submit"
               disabled={authLoading}
               className="w-full h-12 rounded-button bg-yes text-white hover:bg-yes/90 active:scale-[0.97] transition-all font-semibold text-sm disabled:opacity-50"
             >
-              {authLoading ? "Sending…" : "Send magic link"}
+              {authLoading
+                ? "Loading…"
+                : authMode === "signup"
+                  ? "Create account"
+                  : "Sign in"}
             </button>
           </form>
 
           <p className="text-center text-[11px] text-t-2">
-            No spam. Just your friends roasting you when you're wrong.
+            {authMode === "signup" ? (
+              <>
+                Already have an account?{" "}
+                <button onClick={() => { setAuthMode("signin"); setAuthError(""); }} className="text-yes hover:underline">
+                  Sign in
+                </button>
+              </>
+            ) : (
+              <>
+                Don't have an account?{" "}
+                <button onClick={() => { setAuthMode("signup"); setAuthError(""); }} className="text-yes hover:underline">
+                  Sign up
+                </button>
+              </>
+            )}
           </p>
         </div>
       </div>
