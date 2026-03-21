@@ -47,18 +47,20 @@ export default function Landing() {
   useEffect(() => {
     if (!user) return;
     if (step === "auth") {
-      if (pendingBet) {
+      if (shouldShowNudge()) {
+        setStep("homescreen-nudge");
+      } else if (pendingBet) {
         setStep("bet-placed");
       } else if (pendingMarket) {
         setStep("market-live");
       } else {
-        // no pending action, just go home
+        navigate("/home", { replace: true });
       }
     }
   }, [user]);
 
   // Redirect authenticated users with no pending actions
-  if (user && step !== "bet-placed" && step !== "market-live" && step !== "auth") {
+  if (user && !["bet-placed", "market-live", "auth", "homescreen-nudge"].includes(step)) {
     return <Navigate to="/home" replace />;
   }
 
