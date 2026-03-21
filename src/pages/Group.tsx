@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutGrid, Home as HomeIcon, Bell, User } from "lucide-react";
+import BottomNav from "@/components/BottomNav";
 import { format } from "date-fns";
 import OddsBar from "@/components/OddsBar";
 import BetSheet from "@/components/BetSheet";
