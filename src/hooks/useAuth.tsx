@@ -55,7 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         user: session?.user ?? null,
         loading,
-        signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,
         signOut,
