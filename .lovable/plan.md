@@ -1,93 +1,26 @@
 
 
-## Cold Start Landing Flow Rebuild
+## Center Auth Screen + Bet Confirmation + Subtle Homescreen Nudge
 
-Based on the 7 screens provided, the landing page needs a clean state machine that handles two paths: betting on a public market, and creating your own bet. Both lead to magic link auth and distinct post-auth screens.
+### Changes to `src/pages/JoinGroup.tsx` — Auth step (lines 340-424)
 
-### Flow
+1. **Center the content vertically**: Change container from `items-start justify-start pt-14` to `items-center justify-center`
 
-```text
-Path A: Bet on public market
-  browse → betting (sheet) → auth ("Save your bet.") → magic-sent → bet-placed
+2. **Keep pending bet card** at top of the centered block (already there)
 
-Path B: Create your own bet
-  browse → create-bet → auth ("One step to go live.") → magic-sent → market-live
-```
-
-### Screens to build (matching prototypes exactly)
-
-**Screen 1 — Browse (image-20)**
-- "Called It." brand heading + subtitle
-- "Live now" + "X coins in play" indicator
-- MarketCard with PUBLIC BET badge, YES/NO buttons
-- "Create your own bet instead ›" card below (not a text link — a bordered card row)
-
-**Screen 2 — BetSheet (image-21)**
-- Existing BetSheet drawer, no changes needed
-- Header: "How much on YES?" (update from current "Place your bet")
-- CTA: "Bet 25 coins on YES"
-- On confirm: store pending bet in state, advance to `auth`
-
-**Screen 3a — Auth after bet (image-22)**
-- "YOUR PENDING BET" card: Side (YES/NO colored), Amount (coin colored), truncated question
-- "Save your bet." bold heading
-- "Enter your email — we'll send a magic link. No password."
-- Email input, "No spam. Ever." helper
-- Fixed bottom "Send magic link" button
-- Calls `signInWithOtp(email, redirectTo: window.location.origin)`
-- Stores `calledit_pending_bet` in localStorage before sending
-- On success: advance to `magic-sent`
-
-**Screen 3b — Auth after creating bet (image-23)**
-- "YOUR MARKET" card: bold question text, "Goes live the moment you sign in. Your link is ready."
-- "One step to go live." bold heading
-- "Enter your email — we'll send a magic link instantly."
-- Same email input + "No spam. No password. Ever."
-- Fixed bottom "Send magic link" button
-- Stores `calledit_pending_market` in localStorage
-
-**Screen 4 — Magic link sent (image-24)**
-- Centered green checkmark circle icon
-- "Check your email." bold heading
-- "Tap the magic link and you're in — bet saved, coins credited, market live."
-- "While you wait" card: "Share your link now. They need to join to see the odds."
-
-**Screen 5a — Bet placed (image-25)** — shown after magic link return with pending bet
-- "Bet placed." bold heading
-- "YOUR POSITION" card: question, odds bar, "YES · 25 coins" + "68% odds"
-- Gold "Now make one about your crew" CTA card
-- "Create your own bet →" button
-- "Explore the app" secondary button
-
-**Screen 5b — Market live (image-26)** — shown after magic link return with pending market
-- "You're live." bold heading
-- Market card: question, "Your market is live. Share the link — they have to join to see the odds."
-- Share URL + WhatsApp / Copy link / iMessage buttons
-- "You start with 500 coins. Place a bet on your own market too."
-- "See my markets" bottom button
-
-### Files to change
-
-1. **`src/pages/Landing.tsx`** — Full rewrite with new step type:
-   ```ts
-   type Step = "browse" | "betting" | "create-bet" | "auth" | "magic-sent" | "bet-placed" | "market-live";
+3. **Add subtle homescreen nudge** below the auth form toggle, as a small inline hint (not a full-screen takeover). Something like:
    ```
-   - Add `useEffect` on mount: if `user` exists and localStorage has `calledit_pending_bet`, restore it and go to `bet-placed`; if `calledit_pending_market`, go to `market-live`; otherwise redirect to `/home`
-   - Auth screen renders differently based on whether `pendingBet` or `pendingMarket` is set
-   - `magic-sent` is a single shared screen
+   ┌─────────────────────────────┐
+   │ 📱 Add Called It to your    │
+   │ homescreen for quick access │
+   │ iOS: Share → Add to Home    │
+   └─────────────────────────────┘
+   ```
+   - Small card with muted styling (`bg-bg-1 border-b-1 text-t-2 text-xs`)
+   - Device-detected instructions (iOS vs Android) using the same `getDeviceInstructions()` logic from `HomescreenNudge.tsx`
+   - Only shown if not already dismissed (`shouldShowNudge()`) and not in standalone mode
+   - Dismissable with a small × button that sets the localStorage key
 
-2. **`src/components/BetSheet.tsx`** — Update default header from "Place your bet" to "How much on {SIDE}?" to match image-21
-
-3. **`src/hooks/useAuth.tsx`** — Ensure `signInWithOtp` accepts a `redirectTo` param (already done in previous work, just verify)
-
-### localStorage persistence
-
-Before calling `signInWithOtp`:
-- If betting: `localStorage.setItem('calledit_pending_bet', JSON.stringify({ side, amount, marketId, question }))`
-- If creating market: `localStorage.setItem('calledit_pending_market', JSON.stringify({ question }))`
-
-On Landing mount with authenticated user:
-- Check localStorage for either key
-- If found, restore state and show the corresponding post-auth screen
-- Clear localStorage after processing
+### Files
+- **`src/pages/JoinGroup.tsx`**: Layout centering + add inline nudge card after the sign-in/sign-up toggle text
 
