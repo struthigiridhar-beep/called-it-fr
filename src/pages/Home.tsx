@@ -228,6 +228,29 @@ export default function Home() {
         </div>
       </div>
 
+      {/* FAB to create market */}
+      {groups.length > 0 && (
+        <button
+          onClick={() => {
+            setCreateGroupId(groups[0].id);
+            setCreateGroupName(groups[0].name);
+            setCreateOpen(true);
+          }}
+          className="fixed bottom-20 right-4 z-40 h-12 w-12 rounded-full bg-yes flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+        >
+          <Plus className="h-5 w-5 text-white" />
+        </button>
+      )}
+
+      {createGroupId && (
+        <CreateMarketSheet
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          groupId={createGroupId}
+          groupName={createGroupName}
+        />
+      )}
+
       <BottomNav />
     </div>
   );
