@@ -47,10 +47,12 @@ export default function JoinGroup() {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get("ref");
   const navigate = useNavigate();
-  const { user, signInWithOtp } = useAuth();
+  const { user, signUp, signIn } = useAuth();
 
   const [step, setStep] = useState<Step>("preview");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authMode, setAuthMode] = useState<AuthMode>("signup");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
