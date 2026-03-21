@@ -32,7 +32,9 @@ function getInitials(name: string) {
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createGroupId, setCreateGroupId] = useState<string | null>(null);
+  const [createGroupName, setCreateGroupName] = useState("");
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ["home-groups", user?.id],
     enabled: !!user?.id,
