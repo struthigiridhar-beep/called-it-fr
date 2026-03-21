@@ -2,7 +2,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
-import { Plus, LayoutGrid, Home as HomeIcon, Bell, User } from "lucide-react";
+import { Plus } from "lucide-react";
+import BottomNav from "@/components/BottomNav";
 import { useState } from "react";
 
 interface GroupCardData {
@@ -118,19 +119,6 @@ export default function Home() {
     staleTime: 30_000,
   });
 
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["unread-notifications", user?.id],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      const { count } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user!.id)
-        .eq("read", false);
-      return count ?? 0;
-    },
-    staleTime: 15_000,
-  });
 
   const totalLive = groups.reduce((sum, g) => sum + g.liveMarkets, 0);
 
@@ -237,32 +225,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Bottom navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-bg-0 border-t border-b-0 pb-safe-bottom">
-        <div className="flex items-center justify-around h-14 max-w-md mx-auto">
-          <Link to="/home" className="flex flex-col items-center gap-0.5 text-t-0">
-            <LayoutGrid className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Home</span>
-          </Link>
-          <Link to="/home" className="flex flex-col items-center gap-0.5 text-t-2">
-            <HomeIcon className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Groups</span>
-          </Link>
-          <Link to="/notifications" className="flex flex-col items-center gap-0.5 text-t-2 relative">
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 right-0 h-4 min-w-4 rounded-full bg-no text-[9px] text-white font-semibold flex items-center justify-center px-1">
-                {unreadCount}
-              </span>
-            )}
-            <span className="text-[10px] font-medium">Alerts</span>
-          </Link>
-          <Link to="/profile" className="flex flex-col items-center gap-0.5 text-t-2">
-            <User className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Profile</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
     </div>
   );
 }
