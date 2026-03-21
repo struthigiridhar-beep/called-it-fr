@@ -147,7 +147,7 @@ export default function Landing() {
 
           <button
             onClick={() => navigate("/home")}
-            className="block w-full text-center text-sm text-t-2 hover:text-t-1 transition-colors"
+            className="w-full h-12 rounded-button border border-b-1 bg-bg-1 text-t-0 text-sm font-semibold hover:bg-bg-2 active:scale-[0.97] transition-all"
           >
             Not now
           </button>

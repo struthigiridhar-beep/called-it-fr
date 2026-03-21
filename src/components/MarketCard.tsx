@@ -61,7 +61,7 @@ export default function MarketCard({
           {Math.round(total > 0 ? (yesPool / total) * 100 : 50)}% YES
         </span>
         <span className="font-mono-num">
-          {total.toLocaleString()} coins · {deadlineLabel}
+          {total.toLocaleString()} votes · {deadlineLabel}
         </span>
         <span className="font-mono-num text-no font-semibold">
           {Math.round(total > 0 ? (noPool / total) * 100 : 50)}% NO
