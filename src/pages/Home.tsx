@@ -119,19 +119,6 @@ export default function Home() {
     staleTime: 30_000,
   });
 
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["unread-notifications", user?.id],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      const { count } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user!.id)
-        .eq("read", false);
-      return count ?? 0;
-    },
-    staleTime: 15_000,
-  });
 
   const totalLive = groups.reduce((sum, g) => sum + g.liveMarkets, 0);
 
