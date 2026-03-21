@@ -190,8 +190,11 @@ export default function JoinGroup() {
       }
 
       clearPendingBet();
-      setStep("joined");
-    })();
+      if (shouldShowNudge()) {
+        setStep("homescreen-nudge");
+      } else {
+        setStep("joined");
+      }
   }, [user, groupId]);
 
   const handleBetConfirm = (side: Side, amount: number) => {
