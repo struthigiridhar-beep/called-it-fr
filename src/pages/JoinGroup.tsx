@@ -483,8 +483,8 @@ export default function JoinGroup() {
               deadline={firstMarket.deadline}
               onYes={() => { setBetSide("yes"); setBetOpen(true); }}
               onNo={() => { setBetSide("no"); setBetOpen(true); }}
-              yesLabel="YES — join to bet"
-              noLabel="NO — join to bet"
+              yesLabel="YES"
+              noLabel="NO"
             />
           </div>
         ) : (
