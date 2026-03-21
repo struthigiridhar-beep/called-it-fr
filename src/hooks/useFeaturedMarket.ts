@@ -25,7 +25,7 @@ export function useFeaturedMarket() {
         .eq("is_pinned", true)
         .eq("status", "open")
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (pinned) return pinned as FeaturedMarket;
 
