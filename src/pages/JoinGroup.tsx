@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import MarketCard from "@/components/MarketCard";
 import BetSheet from "@/components/BetSheet";
 import OddsBar from "@/components/OddsBar";
-import HomescreenNudge, { shouldShowNudge } from "@/components/HomescreenNudge";
+import HomescreenNudge, { shouldShowNudge, getDeviceInstructions } from "@/components/HomescreenNudge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -62,6 +62,7 @@ export default function JoinGroup() {
   const [betSide, setBetSide] = useState<Side>("yes");
   const [pendingBet, setPendingBet] = useState<{ side: Side; amount: number } | null>(null);
   const [joinProcessed, setJoinProcessed] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
   // Fetch group
   const { data: group, isLoading: groupLoading } = useQuery({
@@ -338,8 +339,16 @@ export default function JoinGroup() {
 
   // ─── SCREEN 3: AUTH (email/password) ───
   if (step === "auth") {
+    const device = getDeviceInstructions();
+    const showNudge = shouldShowNudge();
+
+    const dismissNudge = () => {
+      localStorage.setItem("calledit_homescreen_dismissed", "true");
+      setNudgeDismissed(true);
+    };
+
     return (
-      <div className="flex min-h-[100dvh] flex-col items-start justify-start px-5 pt-14 bg-bg-0">
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center px-5 bg-bg-0">
         <div className="w-full max-w-sm space-y-6">
           {/* Pending bet summary */}
           {pendingBet && firstMarket && (
@@ -419,6 +428,20 @@ export default function JoinGroup() {
               </>
             )}
           </p>
+
+          {/* Subtle homescreen nudge */}
+          {showNudge && !nudgeDismissed && device && (
+            <div className="rounded-card border border-b-1 bg-bg-1 p-3 flex items-start gap-2.5">
+              <span className="text-sm shrink-0">📱</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-t-2 text-xs leading-relaxed">
+                  Add Called It to your homescreen for quick access
+                </p>
+                <p className="text-t-2 text-[10px] mt-0.5 opacity-70">{device.steps}</p>
+              </div>
+              <button onClick={dismissNudge} className="text-t-2 hover:text-t-1 text-xs shrink-0 p-0.5">✕</button>
+            </div>
+          )}
         </div>
       </div>
     );
