@@ -215,6 +215,8 @@ export type Database = {
           deadline: string
           group_id: string
           id: string
+          is_pinned: boolean
+          is_public: boolean
           min_bet: number
           no_pool: number
           question: string
@@ -228,6 +230,8 @@ export type Database = {
           deadline: string
           group_id: string
           id?: string
+          is_pinned?: boolean
+          is_public?: boolean
           min_bet?: number
           no_pool?: number
           question: string
@@ -241,6 +245,8 @@ export type Database = {
           deadline?: string
           group_id?: string
           id?: string
+          is_pinned?: boolean
+          is_public?: boolean
           min_bet?: number
           no_pool?: number
           question?: string
