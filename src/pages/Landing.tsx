@@ -131,6 +131,23 @@ export default function Landing() {
     </div>
   );
 
+  // ─── HOMESCREEN NUDGE ───
+  if (step === "homescreen-nudge") {
+    return (
+      <HomescreenNudge
+        onContinue={() => {
+          if (pendingBet) {
+            setStep("bet-placed");
+          } else if (pendingMarket) {
+            setStep("market-live");
+          } else {
+            navigate("/home", { replace: true });
+          }
+        }}
+      />
+    );
+  }
+
   // ─── BET PLACED (Screen 5a) ───
   if (step === "bet-placed" && pendingBet) {
     const odds = pendingBet.yesPct;
