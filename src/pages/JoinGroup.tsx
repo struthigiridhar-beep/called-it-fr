@@ -240,6 +240,15 @@ export default function JoinGroup() {
   const fmYesPct = fmTotal > 0 ? Math.round(((firstMarket?.yes_pool ?? 0) / fmTotal) * 100) : 50;
   const fmNoPct = 100 - fmYesPct;
 
+  // ─── HOMESCREEN NUDGE ───
+  if (step === "homescreen-nudge") {
+    return (
+      <HomescreenNudge
+        onContinue={() => setStep("joined")}
+      />
+    );
+  }
+
   // ─── SCREEN 4: JOINED ───
   if (step === "joined") {
     const bet = pendingBet;
