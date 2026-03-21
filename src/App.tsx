@@ -9,9 +9,7 @@ import Landing from "@/pages/Landing";
 import JoinGroup from "@/pages/JoinGroup";
 import Home from "@/pages/Home";
 import Group from "@/pages/Group";
-import GroupMarkets from "@/pages/GroupMarkets";
-import GroupFeed from "@/pages/GroupFeed";
-import GroupBoard from "@/pages/GroupBoard";
+
 import Profile from "@/pages/Profile";
 import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
@@ -33,11 +31,7 @@ const App = () => (
 
               {/* Protected routes */}
               <Route path="/home" element={<Home />} />
-              <Route path="/group/:groupId" element={<Group />}>
-                <Route path="markets" element={<GroupMarkets />} />
-                <Route path="feed" element={<GroupFeed />} />
-                <Route path="board" element={<GroupBoard />} />
-              </Route>
+              <Route path="/group/:groupId" element={<Group />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/notifications" element={<Notifications />} />
             </Route>
