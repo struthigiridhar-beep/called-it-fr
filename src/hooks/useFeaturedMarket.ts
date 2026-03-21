@@ -37,7 +37,7 @@ export function useFeaturedMarket() {
         .eq("status", "open")
         .order("yes_pool", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       return (data as FeaturedMarket) ?? null;
     },
