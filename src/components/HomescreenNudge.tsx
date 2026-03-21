@@ -6,7 +6,7 @@ interface HomescreenNudgeProps {
   onContinue: () => void;
 }
 
-function getDeviceInstructions(): { label: string; steps: string } | null {
+export function getDeviceInstructions(): { label: string; steps: string } | null {
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/.test(ua)) {
     return {

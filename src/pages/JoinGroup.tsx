@@ -6,8 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import MarketCard from "@/components/MarketCard";
 import BetSheet from "@/components/BetSheet";
 import OddsBar from "@/components/OddsBar";
-import HomescreenNudge, { shouldShowNudge } from "@/components/HomescreenNudge";
-import { getDeviceInstructions } from "@/components/HomescreenNudge";
+import HomescreenNudge, { shouldShowNudge, getDeviceInstructions } from "@/components/HomescreenNudge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
