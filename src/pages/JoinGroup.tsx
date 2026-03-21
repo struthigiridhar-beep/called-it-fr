@@ -527,7 +527,7 @@ export default function JoinGroup() {
           open={betOpen}
           onOpenChange={(o) => {
             setBetOpen(o);
-            if (!o && hasBet) setStep("auth");
+            if (!o && hasBet) setStep(user ? "joined" : "auth");
           }}
           initialSide={betSide}
           question={firstMarket.question}
