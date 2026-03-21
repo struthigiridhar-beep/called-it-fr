@@ -78,11 +78,7 @@ export default function Landing() {
     setAuthError("");
     setAuthLoading(true);
     try {
-      if (isSignUp) {
-        await signUpWithEmail(email, password);
-      } else {
-        await signInWithEmail(email, password);
-      }
+      await signInWithOtp(email);
       setStep("welcome");
     } catch (err: any) {
       setAuthError(err.message);
