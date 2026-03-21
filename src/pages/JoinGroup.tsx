@@ -514,7 +514,7 @@ export default function JoinGroup() {
 
         {/* Join button */}
         <Button
-          onClick={() => setStep("auth")}
+          onClick={() => setStep(user ? "joined" : "auth")}
           className="w-full h-12 rounded-button bg-bg-1 border border-b-1 text-t-0 hover:bg-bg-2 active:scale-[0.97] transition-all font-semibold text-base"
         >
           Join {group?.name ?? "group"}
