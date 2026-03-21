@@ -322,34 +322,7 @@ export default function JoinGroup() {
     );
   }
 
-  // ─── SCREEN 3b: MAGIC LINK SENT ───
-  if (step === "magic-sent") {
-    return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center px-5 bg-bg-0">
-        <div className="w-full max-w-sm space-y-6 text-center">
-          <div className="mx-auto h-16 w-16 rounded-card border border-b-1 bg-bg-1 flex items-center justify-center">
-            <span className="text-2xl">✉️</span>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-t-0">Check your inbox.</h1>
-            <p className="text-t-1 text-sm">
-              We sent a magic link to <span className="font-semibold text-t-0">{email}</span>.
-              Tap it to join {group?.name ?? "the group"}.
-            </p>
-          </div>
-          <p className="text-t-2 text-xs">
-            Didn't get it? Check spam, or{" "}
-            <button onClick={() => setStep("auth")} className="text-yes hover:underline">
-              try again
-            </button>
-            .
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── SCREEN 3a: AUTH (magic link) ───
+  // ─── SCREEN 3: AUTH (email/password) ───
   if (step === "auth") {
     return (
       <div className="flex min-h-[100dvh] flex-col items-start justify-start px-5 pt-14 bg-bg-0">
