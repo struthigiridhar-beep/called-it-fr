@@ -195,6 +195,7 @@ export default function JoinGroup() {
       } else {
         setStep("joined");
       }
+    })();
   }, [user, groupId]);
 
   const handleBetConfirm = (side: Side, amount: number) => {
