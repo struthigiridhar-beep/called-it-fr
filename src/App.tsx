@@ -33,11 +33,7 @@ const App = () => (
 
               {/* Protected routes */}
               <Route path="/home" element={<Home />} />
-              <Route path="/group/:groupId" element={<Group />}>
-                <Route path="markets" element={<GroupMarkets />} />
-                <Route path="feed" element={<GroupFeed />} />
-                <Route path="board" element={<GroupBoard />} />
-              </Route>
+              <Route path="/group/:groupId" element={<Group />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/notifications" element={<Notifications />} />
             </Route>
