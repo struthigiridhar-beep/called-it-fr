@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import CreateMarketSheet from "@/components/CreateMarketSheet";
 import { useState } from "react";
 
 interface GroupCardData {
