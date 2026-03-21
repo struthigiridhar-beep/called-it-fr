@@ -1,110 +1,93 @@
 
 
-## Referral Flow Rebuild
+## Cold Start Landing Flow Rebuild
 
-The current `JoinGroup.tsx` is broken: it mixes password auth with Google OAuth, has tangled state transitions, and doesn't match the prototypes. Here's the plan to rebuild it from scratch based on the 4 screens you shared.
+Based on the 7 screens provided, the landing page needs a clean state machine that handles two paths: betting on a public market, and creating your own bet. Both lead to magic link auth and distinct post-auth screens.
 
-### Flow Overview
+### Flow
 
 ```text
-Screen 1: PREVIEW (no bet tapped)
-  → User sees inviter avatar, group name, hero text
-  → Featured market card with "About you" badge
-  → Blurred locked markets + member avatars
-  → "Join [Group]" button at bottom
-  → Tapping YES/NO on the market card opens the BetSheet
+Path A: Bet on public market
+  browse → betting (sheet) → auth ("Save your bet.") → magic-sent → bet-placed
 
-Screen 2: BET SHEET (drawer)
-  → "Bet on YES before joining" header (adapts to side)
-  → Amount presets: 25, 50, 100, all-in
-  → CTA: "Join + bet 25 coins on YES"
-  → Confirming stores bet locally, advances to Screen 3
-
-Screen 3: AUTH (magic link)
-  → Shows "YOUR PENDING BET" summary card (side, amount, question)
-  → "One step to get in." heading
-  → Single email input field — no password, no name
-  → "Send magic link" button at bottom
-  → Calls signInWithOtp({ email })
-  → Shows "Check your email" confirmation after sending
-
-Screen 4: JOINED (after magic link click)
-  → Success banner: "You're in [Group]. [Inviter] earns 50 coins"
-  → "YOUR BET IS LIVE" card with position, amount, updated odds bar
-  → Inviter referral info card (+50 c)
-  → "You start with 500 coins."
-  → "See all markets" button at bottom
+Path B: Create your own bet
+  browse → create-bet → auth ("One step to go live.") → magic-sent → market-live
 ```
 
-### Step 1: Add `signInWithOtp` to useAuth
+### Screens to build (matching prototypes exactly)
 
-Add a new method to `AuthContextType` and `AuthProvider`:
-```ts
-signInWithOtp: (email: string) => Promise<void>
-```
-Implementation calls `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + '/join/' + groupId + '?ref=' + inviteCode } })`. The redirect URL needs to bring them back to the same join page so the `useEffect` can complete the join.
+**Screen 1 — Browse (image-20)**
+- "Called It." brand heading + subtitle
+- "Live now" + "X coins in play" indicator
+- MarketCard with PUBLIC BET badge, YES/NO buttons
+- "Create your own bet instead ›" card below (not a text link — a bordered card row)
 
-Remove `signUpWithEmail` and `signInWithEmail` (password-based) since we're going magic-link only. Keep `signInWithGoogle` for future use but remove it from the referral auth screen.
+**Screen 2 — BetSheet (image-21)**
+- Existing BetSheet drawer, no changes needed
+- Header: "How much on YES?" (update from current "Place your bet")
+- CTA: "Bet 25 coins on YES"
+- On confirm: store pending bet in state, advance to `auth`
 
-### Step 2: Rewrite JoinGroup.tsx
+**Screen 3a — Auth after bet (image-22)**
+- "YOUR PENDING BET" card: Side (YES/NO colored), Amount (coin colored), truncated question
+- "Save your bet." bold heading
+- "Enter your email — we'll send a magic link. No password."
+- Email input, "No spam. Ever." helper
+- Fixed bottom "Send magic link" button
+- Calls `signInWithOtp(email, redirectTo: window.location.origin)`
+- Stores `calledit_pending_bet` in localStorage before sending
+- On success: advance to `magic-sent`
 
-Replace the entire file with a clean 4-step state machine:
+**Screen 3b — Auth after creating bet (image-23)**
+- "YOUR MARKET" card: bold question text, "Goes live the moment you sign in. Your link is ready."
+- "One step to go live." bold heading
+- "Enter your email — we'll send a magic link instantly."
+- Same email input + "No spam. No password. Ever."
+- Fixed bottom "Send magic link" button
+- Stores `calledit_pending_market` in localStorage
 
-**State**: `step: "preview" | "auth" | "magic-sent" | "joined"`
-- `pendingBet: { side, amount } | null` — stored before auth, applied after
+**Screen 4 — Magic link sent (image-24)**
+- Centered green checkmark circle icon
+- "Check your email." bold heading
+- "Tap the magic link and you're in — bet saved, coins credited, market live."
+- "While you wait" card: "Share your link now. They need to join to see the odds."
 
-**Screen 1 (preview)**: Matches prototype image-16 exactly:
-- Inviter avatar + "{Name} invited you / to {Group} · N members"
-- Bold heading: "There's already a market about you."
-- Subtext: "Join to see what they're predicting — and bet back."
-- Featured MarketCard with floating "About you" badge (top-right)
-- Blurred locked card: "{N} more markets — join to unlock"
-- Member avatar stack + "{N} already inside"
-- Bottom CTA: "Join {Group}" — tapping goes to auth if no user, joined if user
-- YES/NO buttons open the BetSheet
+**Screen 5a — Bet placed (image-25)** — shown after magic link return with pending bet
+- "Bet placed." bold heading
+- "YOUR POSITION" card: question, odds bar, "YES · 25 coins" + "68% odds"
+- Gold "Now make one about your crew" CTA card
+- "Create your own bet →" button
+- "Explore the app" secondary button
 
-**Screen 2 (BetSheet)**: Modify the existing BetSheet for referral context:
-- Header: "Bet on {SIDE} before joining" (not "Place your bet")
-- Same 25/50/100/all-in presets
-- CTA: "Join + bet {amount} coins on {SIDE}"
-- On confirm: store pending bet, advance to `auth` step
+**Screen 5b — Market live (image-26)** — shown after magic link return with pending market
+- "You're live." bold heading
+- Market card: question, "Your market is live. Share the link — they have to join to see the odds."
+- Share URL + WhatsApp / Copy link / iMessage buttons
+- "You start with 500 coins. Place a bet on your own market too."
+- "See my markets" bottom button
 
-**Screen 3 (auth)**: Matches image-18:
-- If pending bet exists, show "YOUR PENDING BET" card (side, amount, truncated question)
-- Heading: "One step to get in."
-- Subtext: "Enter your email — we'll send a magic link. No password, no forms."
-- Single email input
-- "No spam. Just your friends roasting you when you're wrong."
-- Bottom CTA: "Send magic link"
-- After sending: show "magic-sent" sub-state with "Check your inbox" message
+### Files to change
 
-**Screen 4 (joined)**: Matches image-19:
-- Triggered by `useEffect` when `user` becomes non-null
-- Auto-joins group + credits inviter 50 coins
-- If pending bet exists, places it via Supabase insert into `bets` + updates market pools
-- Success banner: "You're in {Group}. {Inviter} earns 50 coins for inviting you"
-- "YOUR BET IS LIVE" card: question, "Your position: {SIDE}", "{amount} coins in", updated odds bar
-- Inviter info card with avatar: "{Name} invited you — he earns 50 coins each time you bet +50 c"
-- "You start with 500 coins."
-- Bottom CTA: "See all markets"
+1. **`src/pages/Landing.tsx`** — Full rewrite with new step type:
+   ```ts
+   type Step = "browse" | "betting" | "create-bet" | "auth" | "magic-sent" | "bet-placed" | "market-live";
+   ```
+   - Add `useEffect` on mount: if `user` exists and localStorage has `calledit_pending_bet`, restore it and go to `bet-placed`; if `calledit_pending_market`, go to `market-live`; otherwise redirect to `/home`
+   - Auth screen renders differently based on whether `pendingBet` or `pendingMarket` is set
+   - `magic-sent` is a single shared screen
 
-### Step 3: Update BetSheet for referral mode
+2. **`src/components/BetSheet.tsx`** — Update default header from "Place your bet" to "How much on {SIDE}?" to match image-21
 
-Add an optional `referralMode` prop to BetSheet that changes:
-- Header text to "Bet on {SIDE} before joining"
-- CTA text to "Join + bet {amount} coins on {SIDE}"
-- Helper text removed
+3. **`src/hooks/useAuth.tsx`** — Ensure `signInWithOtp` accepts a `redirectTo` param (already done in previous work, just verify)
 
-### Step 4: Persist pending bet across magic link redirect
+### localStorage persistence
 
-Since the magic link opens in a new tab/same tab after email click, the React state is lost. Store `pendingBet` and `groupId` in `localStorage` before sending the magic link. On mount, if user is authenticated and localStorage has a pending bet for this group, restore it and clear storage.
+Before calling `signInWithOtp`:
+- If betting: `localStorage.setItem('calledit_pending_bet', JSON.stringify({ side, amount, marketId, question }))`
+- If creating market: `localStorage.setItem('calledit_pending_market', JSON.stringify({ question }))`
 
-### Technical Details
-
-- **Magic link auth**: `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo } })` — no password needed
-- **Redirect URL**: Must point back to `/join/:groupId?ref=:code` so the join effect fires
-- **localStorage keys**: `calledit_pending_bet` = `{ groupId, side, amount, marketId }`
-- **Bet placement on join**: Insert into `bets` table + update `markets` yes_pool/no_pool via two separate calls (no RPC exists for atomic bet placement yet)
-- **RLS**: Bets INSERT policy requires `auth.uid() = user_id` — works since user is authenticated post-magic-link
-- **Markets SELECT**: Anon can view public markets, but group markets require membership. The join upsert must happen before bet placement.
+On Landing mount with authenticated user:
+- Check localStorage for either key
+- If found, restore state and show the corresponding post-auth screen
+- Clear localStorage after processing
 
