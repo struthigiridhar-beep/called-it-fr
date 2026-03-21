@@ -201,12 +201,12 @@ export default function JoinGroup() {
     setStep("auth");
   };
 
-  const handleSendMagicLink = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     setAuthLoading(true);
     try {
-      // Save pending bet to localStorage before redirect
+      // Save pending bet to localStorage before auth
       if (pendingBet && groupId && firstMarket) {
         savePendingBet({
           groupId,
@@ -215,9 +215,12 @@ export default function JoinGroup() {
           amount: pendingBet.amount,
         });
       }
-      const redirectUrl = `${window.location.origin}/join/${groupId}${inviteCode ? `?ref=${inviteCode}` : ""}`;
-      await signInWithOtp(email, redirectUrl);
-      setStep("magic-sent");
+      if (authMode === "signup") {
+        await signUp(email, password);
+      } else {
+        await signIn(email, password);
+      }
+      // useEffect above handles step transition once user is set
     } catch (err: any) {
       setAuthError(err.message);
     } finally {
