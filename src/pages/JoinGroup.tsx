@@ -535,7 +535,7 @@ export default function JoinGroup() {
           noPct={fmNoPct}
           onConfirm={(side, amount) => {
             handleBetConfirm(side, amount);
-            setStep("auth");
+            setStep(user ? "joined" : "auth");
           }}
         />
       )}
