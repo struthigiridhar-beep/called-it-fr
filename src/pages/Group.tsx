@@ -519,6 +519,14 @@ export default function Group() {
         />
       )}
 
+      {/* Create market sheet */}
+      <CreateMarketSheet
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        groupId={groupId!}
+        groupName={group?.name ?? "Group"}
+      />
+
       <BottomNav />
     </div>
   );
