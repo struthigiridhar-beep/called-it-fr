@@ -62,6 +62,7 @@ export default function JoinGroup() {
   const [betSide, setBetSide] = useState<Side>("yes");
   const [pendingBet, setPendingBet] = useState<{ side: Side; amount: number } | null>(null);
   const [joinProcessed, setJoinProcessed] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
   // Fetch group
   const { data: group, isLoading: groupLoading } = useQuery({
