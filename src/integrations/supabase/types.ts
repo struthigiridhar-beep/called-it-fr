@@ -211,9 +211,9 @@ export type Database = {
         Row: {
           category: string
           created_at: string
-          created_by: string
+          created_by: string | null
           deadline: string
-          group_id: string
+          group_id: string | null
           id: string
           is_pinned: boolean
           is_public: boolean
@@ -226,9 +226,9 @@ export type Database = {
         Insert: {
           category?: string
           created_at?: string
-          created_by: string
+          created_by?: string | null
           deadline: string
-          group_id: string
+          group_id?: string | null
           id?: string
           is_pinned?: boolean
           is_public?: boolean
@@ -241,9 +241,9 @@ export type Database = {
         Update: {
           category?: string
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           deadline?: string
-          group_id?: string
+          group_id?: string | null
           id?: string
           is_pinned?: boolean
           is_public?: boolean
