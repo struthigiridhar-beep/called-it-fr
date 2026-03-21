@@ -10,8 +10,6 @@ import JoinGroup from "@/pages/JoinGroup";
 import Home from "@/pages/Home";
 import Group from "@/pages/Group";
 import GroupMarkets from "@/pages/GroupMarkets";
-import GroupFeed from "@/pages/GroupFeed";
-import GroupBoard from "@/pages/GroupBoard";
 import Profile from "@/pages/Profile";
 import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
