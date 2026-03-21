@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import CreateMarketSheet from "@/components/CreateMarketSheet";
 import { useState } from "react";
 
 interface GroupCardData {
@@ -31,7 +32,9 @@ function getInitials(name: string) {
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createGroupId, setCreateGroupId] = useState<string | null>(null);
+  const [createGroupName, setCreateGroupName] = useState("");
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ["home-groups", user?.id],
     enabled: !!user?.id,
@@ -224,6 +227,29 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {/* FAB to create market */}
+      {groups.length > 0 && (
+        <button
+          onClick={() => {
+            setCreateGroupId(groups[0].id);
+            setCreateGroupName(groups[0].name);
+            setCreateOpen(true);
+          }}
+          className="fixed bottom-20 right-4 z-40 h-12 w-12 rounded-full bg-yes flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+        >
+          <Plus className="h-5 w-5 text-white" />
+        </button>
+      )}
+
+      {createGroupId && (
+        <CreateMarketSheet
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          groupId={createGroupId}
+          groupName={createGroupName}
+        />
+      )}
 
       <BottomNav />
     </div>
