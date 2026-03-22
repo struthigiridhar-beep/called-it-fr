@@ -434,7 +434,10 @@ export default function Group() {
             <>
               {/* Judge banner */}
               {pendingVerdicts.length > 0 && (
-                <div className="rounded-card bg-coin-bg border border-coin-border p-4 space-y-2">
+                <button
+                  onClick={() => navigate(`/group/${groupId}/judge/${pendingVerdicts[0]?.id}`)}
+                  className="w-full rounded-card bg-coin-bg border border-coin-border p-4 space-y-2 text-left"
+                >
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-coin-bg border border-coin-border flex items-center justify-center text-sm font-semibold text-coin shrink-0">
                       {getInitials(user?.email ?? "JU")}
@@ -444,7 +447,7 @@ export default function Group() {
                         You're the judge
                       </p>
                       <p className="text-xs text-coin/70">
-                        Tap to commit verdict · {pendingVerdicts.length} pending
+                        Commit verdict → · {pendingVerdicts.length} pending
                       </p>
                     </div>
                     <span className="text-2xl font-bold font-mono-num text-coin">
@@ -454,7 +457,7 @@ export default function Group() {
                   <p className="text-sm text-t-1 italic">
                     "{pendingVerdicts[0]?.question}"
                   </p>
-                </div>
+                </button>
               )}
 
               {/* YOUR GROUP section */}
