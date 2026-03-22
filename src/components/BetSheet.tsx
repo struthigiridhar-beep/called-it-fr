@@ -30,6 +30,8 @@ interface BetSheetProps {
   /** Pool for the currently selected side */
   yesSidePool?: number;
   noSidePool?: number;
+  /** If the user already has a position, lock to that side */
+  lockedSide?: Side;
 }
 
 export default function BetSheet({
