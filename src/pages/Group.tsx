@@ -524,6 +524,7 @@ export default function Group() {
           totalPool={sheetMarket.yes_pool + sheetMarket.no_pool}
           yesSidePool={sheetMarket.yes_pool}
           noSidePool={sheetMarket.no_pool}
+          lockedSide={betsByMarket.get(sheetMarket.id)?.side}
         />
       )}
 
