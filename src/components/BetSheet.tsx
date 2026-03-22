@@ -30,6 +30,8 @@ interface BetSheetProps {
   /** Pool for the currently selected side */
   yesSidePool?: number;
   noSidePool?: number;
+  /** If the user already has a position, lock to that side */
+  lockedSide?: Side;
 }
 
 export default function BetSheet({
@@ -47,6 +49,7 @@ export default function BetSheet({
   totalPool = 0,
   yesSidePool = 0,
   noSidePool = 0,
+  lockedSide,
 }: BetSheetProps) {
   const [side, setSide] = useState<Side>(initialSide);
   const [amount, setAmount] = useState<number>(minBet);
@@ -179,26 +182,39 @@ export default function BetSheet({
           {/* Side toggle with odds */}
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => setSide("yes")}
+              onClick={() => !lockedSide && setSide("yes")}
+              disabled={!!lockedSide && lockedSide !== "yes"}
               className={`h-12 rounded-button text-sm font-semibold transition-all ${
                 side === "yes"
                   ? "bg-yes-bg border border-yes-border text-yes"
-                  : "bg-bg-2 border border-b-0 text-t-2 hover:text-t-1"
+                  : lockedSide && lockedSide !== "yes"
+                    ? "bg-bg-2 border border-b-0 text-t-2/40 cursor-not-allowed"
+                    : "bg-bg-2 border border-b-0 text-t-2 hover:text-t-1"
               }`}
             >
               YES — <span className="font-mono-num">{yesPct}%</span>
             </button>
             <button
-              onClick={() => setSide("no")}
+              onClick={() => !lockedSide && setSide("no")}
+              disabled={!!lockedSide && lockedSide !== "no"}
               className={`h-12 rounded-button text-sm font-semibold transition-all ${
                 side === "no"
                   ? "bg-no-bg border border-no-border text-no"
-                  : "bg-bg-2 border border-b-0 text-t-2 hover:text-t-1"
+                  : lockedSide && lockedSide !== "no"
+                    ? "bg-bg-2 border border-b-0 text-t-2/40 cursor-not-allowed"
+                    : "bg-bg-2 border border-b-0 text-t-2 hover:text-t-1"
               }`}
             >
               NO — <span className="font-mono-num">{noPct}%</span>
             </button>
           </div>
+
+          {/* Locked side note */}
+          {lockedSide && (
+            <p className="text-xs text-t-2 text-center">
+              You're already on <span className="font-semibold text-t-1">{lockedSide.toUpperCase()}</span> — top up only
+            </p>
+          )}
 
           {/* Amount label */}
           <div className="text-[10px] font-semibold uppercase tracking-wider text-t-2">

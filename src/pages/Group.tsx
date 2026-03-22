@@ -215,13 +215,22 @@ export default function Group() {
   });
 
   const openSheet = (market: MarketRow, side: Side) => {
+    const existingPosition = betsByMarket.get(market.id);
     setSheetMarket(market);
-    setSheetSide(side);
+    setSheetSide(existingPosition ? existingPosition.side : side);
     setSheetOpen(true);
   };
 
   const confirmBet = async (side: Side, amount: number) => {
     if (!sheetMarket || !uid) return;
+
+    // Enforce one side per market
+    const existingPosition = betsByMarket.get(sheetMarket.id);
+    if (existingPosition && existingPosition.side !== side) {
+      toast.error(`You already bet ${existingPosition.side.toUpperCase()}. You can only top up.`);
+      return;
+    }
+
     const finalAmount = Math.min(amount, userCoins);
     if (finalAmount <= 0) {
       toast.error("Not enough coins");
@@ -515,6 +524,7 @@ export default function Group() {
           totalPool={sheetMarket.yes_pool + sheetMarket.no_pool}
           yesSidePool={sheetMarket.yes_pool}
           noSidePool={sheetMarket.no_pool}
+          lockedSide={betsByMarket.get(sheetMarket.id)?.side}
         />
       )}
 
