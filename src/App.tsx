@@ -33,6 +33,7 @@ const App = () => (
               {/* Protected routes */}
               <Route path="/home" element={<Home />} />
               <Route path="/group/:groupId" element={<Group />} />
+              <Route path="/group/:groupId/judge/:marketId" element={<JudgeVerdict />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/notifications" element={<Notifications />} />
             </Route>
