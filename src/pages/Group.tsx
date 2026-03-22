@@ -215,8 +215,9 @@ export default function Group() {
   });
 
   const openSheet = (market: MarketRow, side: Side) => {
+    const existingPosition = betsByMarket.get(market.id);
     setSheetMarket(market);
-    setSheetSide(side);
+    setSheetSide(existingPosition ? existingPosition.side : side);
     setSheetOpen(true);
   };
 
