@@ -457,6 +457,7 @@ export type Database = {
           id: string
           judge_id: string
           market_id: string
+          status: string
           verdict: Database["public"]["Enums"]["verdict_outcome"]
         }
         Insert: {
@@ -464,6 +465,7 @@ export type Database = {
           id?: string
           judge_id: string
           market_id: string
+          status?: string
           verdict: Database["public"]["Enums"]["verdict_outcome"]
         }
         Update: {
@@ -471,6 +473,7 @@ export type Database = {
           id?: string
           judge_id?: string
           market_id?: string
+          status?: string
           verdict?: Database["public"]["Enums"]["verdict_outcome"]
         }
         Relationships: [
