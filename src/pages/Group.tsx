@@ -55,6 +55,7 @@ export default function Group() {
   const { groupId } = useParams<{ groupId: string }>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("markets");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMarket, setSheetMarket] = useState<MarketRow | null>(null);
