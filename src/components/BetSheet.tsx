@@ -49,6 +49,7 @@ export default function BetSheet({
   totalPool = 0,
   yesSidePool = 0,
   noSidePool = 0,
+  lockedSide,
 }: BetSheetProps) {
   const [side, setSide] = useState<Side>(initialSide);
   const [amount, setAmount] = useState<number>(minBet);
