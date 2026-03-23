@@ -119,20 +119,64 @@ export default function Group() {
     },
   });
 
-  // Fetch verdicts for resolved/closed markets (group + public)
+  // Fetch verdicts for resolved/closed/disputed markets (group + public)
   const { data: marketVerdicts = [] } = useQuery({
     queryKey: ["group-market-verdicts", groupId, groupMarkets.length, publicMarkets.length],
     enabled: (groupMarkets.length > 0 || publicMarkets.length > 0),
     queryFn: async () => {
       const closedIds = [...groupMarkets, ...publicMarkets]
-        .filter((m) => m.status === "resolved" || m.status === "closed")
+        .filter((m) => m.status === "resolved" || m.status === "closed" || m.status === "disputed")
         .map((m) => m.id);
       if (!closedIds.length) return [];
       const { data } = await supabase
         .from("verdicts")
-        .select("market_id, verdict, status")
+        .select("id, market_id, verdict, status, committed_at")
         .in("market_id", closedIds);
       return data ?? [];
+    },
+  });
+
+  // Fetch disputes for markets with verdicts
+  const { data: disputes = [] } = useQuery({
+    queryKey: ["group-disputes", marketVerdicts.length],
+    enabled: marketVerdicts.length > 0,
+    queryFn: async () => {
+      const verdictIds = marketVerdicts.map((v) => v.id);
+      if (!verdictIds.length) return [];
+      const { data } = await supabase
+        .from("disputes")
+        .select("id, verdict_id, status, flags")
+        .in("verdict_id", verdictIds);
+      return data ?? [];
+    },
+  });
+
+  // Fetch user's flags
+  const { data: userFlags = [] } = useQuery({
+    queryKey: ["user-dispute-flags", uid, disputes.length],
+    enabled: !!uid && disputes.length > 0,
+    queryFn: async () => {
+      const disputeIds = disputes.map((d) => d.id);
+      if (!disputeIds.length) return [];
+      const { data } = await supabase
+        .from("dispute_flags")
+        .select("dispute_id")
+        .eq("user_id", uid!)
+        .in("dispute_id", disputeIds);
+      return data ?? [];
+    },
+  });
+
+  // Group member count for flag threshold
+  const { data: memberCount = 0 } = useQuery({
+    queryKey: ["group-member-count", groupId],
+    enabled: !!groupId,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("group_members")
+        .select("user_id", { count: "exact", head: true })
+        .eq("group_id", groupId!);
+      return count ?? 0;
     },
   });
 
