@@ -56,11 +56,90 @@ export type Database = {
           },
         ]
       }
+      dispute_flags: {
+        Row: {
+          created_at: string
+          dispute_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dispute_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dispute_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispute_flags_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispute_flags_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispute_votes: {
+        Row: {
+          created_at: string
+          dispute_id: string
+          id: string
+          user_id: string
+          vote: Database["public"]["Enums"]["verdict_outcome"]
+        }
+        Insert: {
+          created_at?: string
+          dispute_id: string
+          id?: string
+          user_id: string
+          vote: Database["public"]["Enums"]["verdict_outcome"]
+        }
+        Update: {
+          created_at?: string
+          dispute_id?: string
+          id?: string
+          user_id?: string
+          vote?: Database["public"]["Enums"]["verdict_outcome"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispute_votes_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispute_votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       disputes: {
         Row: {
           created_at: string
           flags: number
           id: string
+          resolution_verdict:
+            | Database["public"]["Enums"]["verdict_outcome"]
+            | null
+          resolved_at: string | null
           status: Database["public"]["Enums"]["dispute_status"]
           verdict_id: string
         }
@@ -68,6 +147,10 @@ export type Database = {
           created_at?: string
           flags?: number
           id?: string
+          resolution_verdict?:
+            | Database["public"]["Enums"]["verdict_outcome"]
+            | null
+          resolved_at?: string | null
           status?: Database["public"]["Enums"]["dispute_status"]
           verdict_id: string
         }
@@ -75,6 +158,10 @@ export type Database = {
           created_at?: string
           flags?: number
           id?: string
+          resolution_verdict?:
+            | Database["public"]["Enums"]["verdict_outcome"]
+            | null
+          resolved_at?: string | null
           status?: Database["public"]["Enums"]["dispute_status"]
           verdict_id?: string
         }
@@ -498,6 +585,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cast_dispute_vote: {
+        Args: {
+          _dispute_id: string
+          _user_id: string
+          _vote: Database["public"]["Enums"]["verdict_outcome"]
+        }
+        Returns: Json
+      }
+      flag_verdict: {
+        Args: { _user_id: string; _verdict_id: string }
+        Returns: Json
+      }
       resolve_market: {
         Args: { _judge_id: string; _market_id: string }
         Returns: undefined

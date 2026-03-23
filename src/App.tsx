@@ -10,6 +10,7 @@ import JoinGroup from "@/pages/JoinGroup";
 import Home from "@/pages/Home";
 import Group from "@/pages/Group";
 import JudgeVerdict from "@/pages/JudgeVerdict";
+import DisputeRevote from "@/pages/DisputeRevote";
 
 import Profile from "@/pages/Profile";
 import Notifications from "@/pages/Notifications";
