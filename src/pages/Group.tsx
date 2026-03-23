@@ -91,7 +91,7 @@ export default function Group() {
     },
   });
 
-  // Fetch group markets (private)
+  // Fetch group markets (private, all statuses for rendering)
   const { data: groupMarkets = [] } = useQuery({
     queryKey: ["group-markets", groupId],
     enabled: !!groupId,
@@ -101,9 +101,25 @@ export default function Group() {
         .select("*")
         .eq("group_id", groupId!)
         .eq("is_public", false)
-        .eq("status", "open")
         .order("created_at", { ascending: false });
       return (data ?? []) as MarketRow[];
+    },
+  });
+
+  // Fetch verdicts for resolved/closed markets in this group
+  const { data: marketVerdicts = [] } = useQuery({
+    queryKey: ["group-market-verdicts", groupId],
+    enabled: !!groupId && groupMarkets.length > 0,
+    queryFn: async () => {
+      const closedIds = groupMarkets
+        .filter((m) => m.status === "resolved" || m.status === "closed")
+        .map((m) => m.id);
+      if (!closedIds.length) return [];
+      const { data } = await supabase
+        .from("verdicts")
+        .select("market_id, verdict, status")
+        .in("market_id", closedIds);
+      return data ?? [];
     },
   });
 
