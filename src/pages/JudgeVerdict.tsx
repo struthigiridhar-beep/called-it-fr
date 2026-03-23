@@ -219,9 +219,7 @@ export default function JudgeVerdict() {
           {/* Actions */}
           <div className="space-y-3">
             <button
-              onClick={() => {
-                setRevealMarketId(marketId!);
-              }}
+              onClick={() => setShowCeremony(true)}
               className="w-full h-12 rounded-button bg-bg-2 border border-b-0 text-sm font-semibold text-t-1"
             >
               View verdict
