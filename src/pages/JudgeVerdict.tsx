@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Shield, AlertTriangle, Check } from "lucide-react";
 import OddsBar from "@/components/OddsBar";
 import BottomNav from "@/components/BottomNav";
+import RevealCeremony from "@/components/RevealCeremony";
 import { toast } from "sonner";
 
 type VerdictChoice = "yes" | "no" | null;
