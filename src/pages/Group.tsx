@@ -289,6 +289,23 @@ export default function Group() {
     setSheetOpen(true);
   };
 
+  const handleFlag = async (verdictId: string) => {
+    if (!uid) return;
+    try {
+      const { data, error } = await supabase.rpc("flag_verdict", {
+        _verdict_id: verdictId,
+        _user_id: uid,
+      });
+      if (error) throw error;
+      toast.success(`Flagged (${(data as any)?.flags}/${(data as any)?.threshold} needed)`);
+      queryClient.invalidateQueries({ queryKey: ["group-disputes"] });
+      queryClient.invalidateQueries({ queryKey: ["user-dispute-flags"] });
+      queryClient.invalidateQueries({ queryKey: ["group-markets"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to flag");
+    }
+  };
+
   const confirmBet = async (side: Side, amount: number) => {
     if (!sheetMarket || !uid) return;
 
