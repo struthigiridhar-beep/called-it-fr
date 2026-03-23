@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import OddsBar from "@/components/OddsBar";
 import BetSheet from "@/components/BetSheet";
 import CreateMarketSheet from "@/components/CreateMarketSheet";
+import RevealCeremony from "@/components/RevealCeremony";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 
