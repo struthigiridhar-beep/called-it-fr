@@ -420,9 +420,15 @@ export default function Group() {
               Verdict: {verdictRow.verdict.toUpperCase()}
             </span>
           )}
-          {isClosed && !isResolved && (
+           {isClosed && !isResolved && !isDisputed && (
             <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-coin-bg border border-coin-border text-coin">
               Closed · awaiting verdict
+            </span>
+          )}
+          {isDisputed && (
+            <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-bold bg-no-bg border border-no-border text-no">
+              <AlertTriangle className="h-3 w-3" />
+              Disputed
             </span>
           )}
           {isFirstBet && (
@@ -430,7 +436,7 @@ export default function Group() {
               Your first bet
             </span>
           )}
-          {!isResolved && !isClosed && (
+          {!isResolved && !isClosed && !isDisputed && (
             <span className="text-xs text-t-2 ml-auto">
               closes {formatDeadline(m.deadline)}
             </span>
