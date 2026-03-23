@@ -219,10 +219,22 @@ export default function Group() {
     return sorted[0]?.market_id ?? null;
   })();
 
-  // Sort public markets: first bet pinned, then by total pool desc
+  // Status sort order: open first, then closed, then resolved/disputed
+  const statusOrder = (s: string) => s === "open" ? 0 : s === "closed" ? 1 : 2;
+
+  // Sort group markets: open first, closed/resolved at bottom
+  const sortedGroupMarkets = [...groupMarkets].sort((a, b) => {
+    const so = statusOrder(a.status) - statusOrder(b.status);
+    if (so !== 0) return so;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  // Sort public markets: first bet pinned, then by status, then by pool size
   const sortedPublicMarkets = [...publicMarkets].sort((a, b) => {
     if (a.id === firstBetMarketId) return -1;
     if (b.id === firstBetMarketId) return 1;
+    const so = statusOrder(a.status) - statusOrder(b.status);
+    if (so !== 0) return so;
     return (b.yes_pool + b.no_pool) - (a.yes_pool + a.no_pool);
   });
 
