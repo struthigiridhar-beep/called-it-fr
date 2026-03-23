@@ -465,6 +465,33 @@ export default function RevealCeremony({
               ))}
             </div>
 
+            {/* Flag section */}
+            {canFlagVerdict && (
+              <div className="w-full max-w-xs rounded-card bg-bg-1 border border-b-0 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-t-2 uppercase tracking-wider">Flag verdict</p>
+                  <p className="text-xs text-t-2 font-mono-num">{disputeData?.flags ?? 0}/{flagThreshold}</p>
+                </div>
+                <div className="h-1.5 rounded-full bg-bg-2 overflow-hidden">
+                  <div
+                    className="h-full bg-no transition-all rounded-full"
+                    style={{ width: `${Math.min(100, ((disputeData?.flags ?? 0) / flagThreshold) * 100)}%` }}
+                  />
+                </div>
+                {hasUserFlagged ? (
+                  <p className="text-xs text-t-2 text-center">You've flagged this verdict</p>
+                ) : (
+                  <button
+                    onClick={handleFlagVerdict}
+                    className="w-full h-9 rounded-button text-xs font-semibold bg-no-bg border border-no-border text-no flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all"
+                  >
+                    <Flag className="h-3 w-3" />
+                    Flag this verdict
+                  </button>
+                )}
+              </div>
+            )}
+
             <button
               onClick={() => setState(4)}
               className="w-full max-w-xs h-12 rounded-button bg-yes text-white font-semibold text-sm active:scale-[0.97] transition-all"
