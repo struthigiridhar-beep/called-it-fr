@@ -139,32 +139,26 @@ export default function Group() {
     },
   });
 
-  // Judge banner: verdicts needed for closed markets in this group
+  // Judge banner: pending verdicts assigned to this user in this group
   const { data: pendingVerdicts = [] } = useQuery({
     queryKey: ["pending-verdicts", groupId, uid],
     enabled: !!groupId && !!uid,
     queryFn: async () => {
-      // Get closed markets in this group
-      const { data: closedMarkets } = await supabase
-        .from("markets")
-        .select("id, question, deadline")
-        .eq("group_id", groupId!)
-        .eq("status", "closed");
-      if (!closedMarkets?.length) return [];
-      // Check if user is judge for any (verdicts table has judge_id)
+      // Get pending verdicts where user is the assigned judge
       const { data: verdicts } = await supabase
         .from("verdicts")
         .select("id, market_id")
         .eq("judge_id", uid!)
-        .in("market_id", closedMarkets.map((m) => m.id));
-      // Markets that already have a verdict from this judge
-      const settledIds = new Set((verdicts ?? []).map((v) => v.market_id));
-      // Return markets that need a verdict (no verdict yet)
-      // Actually verdicts means they already judged. We want markets where the user IS the judge but hasn't committed.
-      // Since we don't have a judge_id on markets, we'll skip judge banner for now unless there's a verdict.
-      // For now, return closed markets where user has NO verdict yet — assuming anyone in group can judge.
-      // TODO: refine when judge assignment is clearer
-      return closedMarkets.filter((m) => !settledIds.has(m.id));
+        .eq("status", "pending");
+      if (!verdicts?.length) return [];
+      // Get matching closed markets in this group
+      const { data: markets } = await supabase
+        .from("markets")
+        .select("id, question, deadline")
+        .eq("group_id", groupId!)
+        .eq("status", "closed")
+        .in("id", verdicts.map((v) => v.market_id));
+      return (markets ?? []);
     },
   });
 
