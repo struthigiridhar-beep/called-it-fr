@@ -387,8 +387,13 @@ export default function Group() {
     const isResolved = m.status === "resolved";
     const isClosed = m.status === "closed";
     const verdictRow = marketVerdicts.find((v) => v.market_id === m.id);
-
-    return (
+    const isDisputed = m.status === "disputed";
+    const disputeRow = verdictRow ? disputes.find((d) => d.verdict_id === verdictRow.id) : null;
+    const hasFlagged = disputeRow ? userFlags.some((f) => f.dispute_id === disputeRow.id) : false;
+    const flagThreshold = Math.floor(memberCount / 2) + 1;
+    // Can flag if resolved, verdict committed, within 12h
+    const canFlag = isResolved && verdictRow?.status === "committed" && verdictRow?.committed_at &&
+      (new Date().getTime() - new Date(verdictRow.committed_at).getTime()) < 12 * 60 * 60 * 1000;
       <div
         key={m.id}
         className="rounded-card border border-b-0 bg-bg-1 p-4 space-y-3"
