@@ -13,6 +13,7 @@ interface GroupCardData {
   memberCount: number;
   userRank: number;
   liveMarkets: number;
+  resolvedMarkets: number;
   streak: number;
   xpThisWeek: number;
   xp: number;
