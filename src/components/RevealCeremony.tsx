@@ -175,16 +175,20 @@ export default function RevealCeremony({
   });
 
   // Auto-advance from deliberating when verdict committed
+  // Effect 1: detect committed verdict
   useEffect(() => {
     if (state === 2 && verdict?.status === "committed" && !verdictIncoming) {
       setVerdictIncoming(true);
-      const timer = setTimeout(() => {
-        setState(3);
-        setVerdictIncoming(false);
-      }, 2500);
-      return () => clearTimeout(timer);
     }
   }, [state, verdict?.status, verdictIncoming]);
+
+  // Effect 2: auto-advance after delay
+  useEffect(() => {
+    if (verdictIncoming && state === 2) {
+      const timer = setTimeout(() => setState(3), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [verdictIncoming, state]);
 
   // Payout calculations
   const payouts = useMemo(() => {
