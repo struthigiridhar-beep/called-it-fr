@@ -383,7 +383,10 @@ export default function JudgeVerdict() {
       {showCeremony && groupId && marketId && (
         <RevealCeremony
           open={showCeremony}
-          onClose={() => setShowCeremony(false)}
+          onClose={() => {
+            setShowCeremony(false);
+            navigate(`/group/${groupId}`);
+          }}
           marketId={marketId}
           groupId={groupId}
           groupName={group?.name ?? "Group"}
