@@ -20,6 +20,7 @@ export default function JudgeVerdict() {
 
   const [choice, setChoice] = useState<VerdictChoice>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showCeremony, setShowCeremony] = useState(false);
 
   // Fetch market
   const { data: market } = useQuery({
