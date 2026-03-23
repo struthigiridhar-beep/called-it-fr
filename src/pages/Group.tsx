@@ -564,7 +564,7 @@ export default function Group() {
                   <h3 className="text-[10px] font-semibold uppercase tracking-wider text-t-2">
                     Your Group
                   </h3>
-                  {groupMarkets.map((m) => renderMarketCard(m, false))}
+                  {sortedGroupMarkets.map((m) => renderMarketCard(m, false))}
                 </div>
               )}
 
