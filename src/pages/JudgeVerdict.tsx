@@ -149,11 +149,12 @@ export default function JudgeVerdict() {
         .eq("id", verdict.id);
       if (error) throw error;
 
-      // Update market status to resolved
-      await supabase
-        .from("markets")
-        .update({ status: "resolved" })
-        .eq("id", market.id);
+      // Update market status to resolved via RPC (bypasses RLS)
+      const { error: rpcError } = await supabase.rpc("resolve_market", {
+        _market_id: market.id,
+        _judge_id: uid,
+      });
+      if (rpcError) throw rpcError;
 
       queryClient.invalidateQueries({ queryKey: ["verdict"] });
       queryClient.invalidateQueries({ queryKey: ["market"] });
