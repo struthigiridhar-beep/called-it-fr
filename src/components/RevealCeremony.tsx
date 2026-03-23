@@ -175,7 +175,66 @@ export default function RevealCeremony({
     },
   });
 
-  // Auto-advance from deliberating when verdict committed
+  // Dispute/flag data for State 3
+  const { data: disputeData } = useQuery({
+    queryKey: ["reveal-dispute", verdict?.id],
+    enabled: open && !!verdict?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("disputes")
+        .select("id, flags, status")
+        .eq("verdict_id", verdict!.id)
+        .single();
+      return data;
+    },
+  });
+
+  const { data: hasUserFlagged = false } = useQuery({
+    queryKey: ["reveal-user-flag", disputeData?.id, uid],
+    enabled: open && !!disputeData?.id && !!uid,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("dispute_flags")
+        .select("id")
+        .eq("dispute_id", disputeData!.id)
+        .eq("user_id", uid!)
+        .single();
+      return !!data;
+    },
+  });
+
+  const { data: ceremonyMemberCount = 0 } = useQuery({
+    queryKey: ["reveal-member-count", groupId],
+    enabled: open && !!groupId,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("group_members")
+        .select("user_id", { count: "exact", head: true })
+        .eq("group_id", groupId);
+      return count ?? 0;
+    },
+  });
+
+  const flagThreshold = Math.floor(ceremonyMemberCount / 2) + 1;
+  const canFlagVerdict = verdict?.status === "committed" && verdict?.committed_at &&
+    (new Date().getTime() - new Date(verdict.committed_at).getTime()) < 12 * 60 * 60 * 1000;
+
+  const handleFlagVerdict = async () => {
+    if (!uid || !verdict?.id) return;
+    try {
+      const { data, error } = await supabase.rpc("flag_verdict", {
+        _verdict_id: verdict.id,
+        _user_id: uid,
+      });
+      if (error) throw error;
+      toast.success(`Flagged (${(data as any)?.flags}/${(data as any)?.threshold} needed)`);
+      queryClient.invalidateQueries({ queryKey: ["reveal-dispute"] });
+      queryClient.invalidateQueries({ queryKey: ["reveal-user-flag"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to flag");
+    }
+  };
+
   // Effect 1: detect committed verdict
   useEffect(() => {
     if (state === 2 && verdict?.status === "committed" && !verdictIncoming) {
