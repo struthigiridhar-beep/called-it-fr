@@ -396,6 +396,20 @@ export default function Group() {
         )}
 
         {isClosed && !isResolved && (() => {
+          // Defensive: if a committed verdict exists, treat as resolved
+          const hasCommittedVerdict = marketVerdicts.some(
+            (v) => v.market_id === m.id && v.status === "committed"
+          );
+          if (hasCommittedVerdict) {
+            return (
+              <button
+                onClick={() => setRevealMarketId(m.id)}
+                className="w-full h-11 rounded-button text-sm font-semibold bg-bg-2 border border-b-0 text-t-1 active:scale-[0.97] transition-all"
+              >
+                View result
+              </button>
+            );
+          }
           const isJudgeForMarket = pendingVerdicts.some((v) => v.id === m.id);
           if (isJudgeForMarket) {
             return (
@@ -622,7 +636,9 @@ export default function Group() {
           groupId={groupId!}
           groupName={group?.name ?? "Group"}
           initialState={
-            groupMarkets.find((m) => m.id === revealMarketId)?.status === "resolved" ? 3 : 1
+            groupMarkets.find((m) => m.id === revealMarketId)?.status === "resolved"
+            || marketVerdicts.some((v) => v.market_id === revealMarketId && v.status === "committed")
+              ? 3 : 1
           }
         />
       )}
