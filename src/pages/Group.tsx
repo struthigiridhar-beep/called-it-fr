@@ -167,7 +167,7 @@ export default function Group() {
         .from("verdicts")
         .select("id, market_id")
         .eq("judge_id", uid!)
-        .eq("status", "pending");
+        .in("status", ["pending", "committed"]);
       if (!verdicts?.length) return [];
       // Get matching closed markets in this group
       const { data: markets } = await supabase
