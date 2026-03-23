@@ -106,6 +106,19 @@ export default function Group() {
     },
   });
 
+  // Fetch public markets (all statuses)
+  const { data: publicMarkets = [] } = useQuery({
+    queryKey: ["public-markets"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("markets")
+        .select("*")
+        .eq("is_public", true)
+        .order("created_at", { ascending: false });
+      return (data ?? []) as MarketRow[];
+    },
+  });
+
   // Fetch verdicts for resolved/closed markets (group + public)
   const { data: marketVerdicts = [] } = useQuery({
     queryKey: ["group-market-verdicts", groupId, groupMarkets.length, publicMarkets.length],
@@ -120,19 +133,6 @@ export default function Group() {
         .select("market_id, verdict, status")
         .in("market_id", closedIds);
       return data ?? [];
-    },
-  });
-
-  // Fetch public markets (all statuses)
-  const { data: publicMarkets = [] } = useQuery({
-    queryKey: ["public-markets"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("markets")
-        .select("*")
-        .eq("is_public", true)
-        .order("created_at", { ascending: false });
-      return (data ?? []) as MarketRow[];
     },
   });
 
