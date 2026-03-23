@@ -498,6 +498,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      resolve_market: {
+        Args: { _judge_id: string; _market_id: string }
+        Returns: undefined
+      }
       user_group_ids: { Args: { _user_id: string }; Returns: string[] }
     }
     Enums: {
