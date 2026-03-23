@@ -1,37 +1,41 @@
 
 
-## Fix: Judge should see both verdict banner AND Reveal button
+## Problem
 
-### Problem
-Currently the judge sees the "You're the judge" banner at the top AND the "Reveal →" button on the closed market card, but they function as two separate paths. The judge banner goes to the verdict commitment screen, and "Reveal →" opens the ceremony modal. This is correct behavior — the judge needs the verdict screen to actually commit, and the Reveal button shows the ceremony.
+The judge's "Pass verdict" button never appears because:
 
-However, looking at the screenshot, the closed market card only shows "Reveal →". For the judge, it would be clearer to show **both** a "Pass verdict" button (linking to the judge screen) and the "Reveal →" button on the same card, so the judge has direct access from the card itself without relying solely on the banner.
+1. **Verdict status mismatch**: The verdict for "Will it rain tomorrow?" has `status = 'committed'` but the query on line 170 only looks for `status = 'pending'`. Since the verdict was already committed, `pendingVerdicts` returns empty, so `isJudgeForMarket` is always false.
 
-### Changes
+2. **Market not transitioning to resolved**: The market remains `closed` even after the verdict is committed. There's no logic to update the market status to `resolved` after commitment.
 
-**`src/pages/Group.tsx`** — In the `renderMarketCard` function (around line 398):
+## Plan
 
-For closed markets where the current user is the assigned judge (check if `pendingVerdicts` includes this market's ID), render **two buttons in a grid**:
-1. **"Pass verdict"** — coin-colored, navigates to `/group/${groupId}/judge/${m.id}`
-2. **"Reveal →"** — secondary style, opens the reveal ceremony modal
+### 1. Fix the pendingVerdicts query to include both statuses
 
-For closed markets where the user is NOT the judge, keep the single "Reveal →" button as-is.
+In `Group.tsx` line 170, change the filter to match both `pending` and `committed` verdicts so the judge sees the banner and dual buttons for markets they haven't fully resolved yet:
 
-For resolved markets, keep the single "View result" button as-is.
-
-```text
-Closed market card (judge):
-  ┌──────────────┬──────────────┐
-  │ Pass verdict  │  Reveal →   │
-  └──────────────┴──────────────┘
-
-Closed market card (non-judge):
-  ┌─────────────────────────────┐
-  │         Reveal →            │
-  └─────────────────────────────┘
+```
+.in("status", ["pending", "committed"])
 ```
 
-### Technical Detail
-- Derive `isJudgeForMarket` by checking if `pendingVerdicts.some(v => v.id === m.id)`
-- Use `grid grid-cols-2 gap-2` layout for the two-button judge variant
+Also update the market filter on line 177 to keep `.eq("status", "closed")` since that's correct — the market stays closed until fully resolved.
+
+### 2. Update market status to "resolved" after verdict commitment
+
+In `JudgeVerdict.tsx`, after the verdict is committed successfully, also update the market's status from `closed` to `resolved`. This ensures the market card shows "View result" instead of "Reveal →" once the judge has acted.
+
+### 3. Show appropriate buttons based on verdict status
+
+Refine the card button logic:
+- **Verdict pending** (judge assigned but hasn't committed): Show "Pass verdict" + "Reveal →"
+- **Verdict committed** (judge committed, market still closed): Show "View result" since verdict exists
+- **Market resolved**: Show "View result"
+
+### Technical Details
+
+**Files modified**: `src/pages/Group.tsx`, `src/pages/JudgeVerdict.tsx`
+
+- `Group.tsx` line 170: `.in("status", ["pending", "committed"])` 
+- `JudgeVerdict.tsx`: Add `await supabase.from("markets").update({ status: "resolved" }).eq("id", marketId)` after successful verdict commit
+- Optionally split the button logic to distinguish pending vs committed verdicts
 
