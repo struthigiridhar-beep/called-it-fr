@@ -487,7 +487,7 @@ export type Database = {
           {
             foreignKeyName: "verdicts_market_id_fkey"
             columns: ["market_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "markets"
             referencedColumns: ["id"]
           },
