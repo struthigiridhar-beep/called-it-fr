@@ -1,66 +1,82 @@
 
 
-## Diagnosis
+## Dispute & Re-vote System
 
-### Why the judge wasn't assigned "the minute" the market closed
-The `assign-judge` edge function runs on a **cron schedule** (every ~5 minutes). It polls for markets with `status = 'open'` past their deadline, closes them, and assigns a judge. There is no database trigger that fires instantly on deadline expiry. So there's always a delay of up to 5 minutes. In this case, the edge function DID eventually run and assign you — but the status it wrote was `'pending'` in its JS code, which Supabase stored correctly as lowercase `pending`.
+### Overview
+After a verdict is committed, group members can flag it within 12 hours. When flags exceed half the group size, a community re-vote is triggered. Members vote YES/NO, and when a majority is reached, the dispute resolves -- either upholding or overturning the original verdict, with coin redistribution and integrity score changes.
 
-### Why "Pass verdict" still doesn't show
-The gym market (`4f97de1b`) has **two verdict rows** — a duplicate:
-1. `a67334f2` — status: `PENDING` (uppercase, from the original edge function run or manual insert)
-2. `750fb77b` — status: `pending` (lowercase, the one you manually added)
+### Database Changes (1 migration)
 
-The UI query for `pendingVerdicts` filters `.eq("status", "pending")` and finds row #2, then cross-references with markets `.eq("status", "closed")`. This should work. **However**, the `hasCommittedVerdict` check runs FIRST (line 400), and `marketVerdicts` fetches ALL verdicts for closed markets. Neither duplicate has status `committed`, so that check passes correctly.
+**New tables:**
 
-The likely remaining issue: the `pendingVerdicts` query returns market rows with `id = market.id`. The banner check `pendingVerdicts[0]?.id` and the CTA check `pendingVerdicts.some((v) => v.id === m.id)` should match. **But the assign-judge edge function also checks for existing verdicts before inserting** — it checks `SELECT id FROM verdicts WHERE market_id = X LIMIT 1`. The original PENDING row existed, so the cron would have skipped creating a second one. The second `pending` row was likely your manual insert. The UI should actually work now — this may just need a page refresh.
+1. `dispute_flags` — tracks individual flags (prevents double-flagging)
+   - `id UUID PK`
+   - `dispute_id UUID FK -> disputes`
+   - `user_id UUID FK -> users`  
+   - `created_at TIMESTAMPTZ DEFAULT now()`
+   - `UNIQUE(dispute_id, user_id)`
+   - RLS: group members can view; authenticated users can insert (if in group)
 
-**BUT** — the real systemic issues are:
-1. No uniqueness constraint on `(market_id)` for verdicts — allows duplicates
-2. Verdict status is free-text, not an enum — allows casing bugs
-3. The edge function inserts `status: "pending"` but there's no guarantee other paths won't use different casing
+2. `dispute_votes` — tracks re-vote ballots
+   - `id UUID PK`
+   - `dispute_id UUID FK -> disputes`
+   - `user_id UUID FK -> users`
+   - `vote verdict_outcome (yes/no)`
+   - `created_at TIMESTAMPTZ DEFAULT now()`
+   - `UNIQUE(dispute_id, user_id)`
+   - RLS: group members can view; authenticated users can insert (if in group)
 
-### Plan
+**Alter `disputes` table:**
+- Add `resolved_at TIMESTAMPTZ NULL`
+- Add `resolution_verdict verdict_outcome NULL` (the final re-vote result)
 
-#### 1. Database cleanup migration
-- Delete the duplicate PENDING (uppercase) verdict row
-- Normalize all verdict statuses to lowercase
-- Add a CHECK constraint on `verdicts.status` to only allow `pending`, `committed`, `overturned`
-- Add a UNIQUE constraint on `verdicts(market_id)` to prevent duplicate judge assignments
-- Also fix any closed markets with committed verdicts (backfill to resolved)
+**New RPCs (SECURITY DEFINER):**
 
-```sql
--- Remove the uppercase duplicate
-DELETE FROM verdicts WHERE id = 'a67334f2-94eb-4cbe-b2a4-72e1cfc14857';
+1. `flag_verdict(_verdict_id, _user_id)`:
+   - Validates user is in the group, hasn't already flagged, verdict is committed, within 12h window
+   - Upserts dispute row (creates if first flag, increments `flags` count)
+   - Inserts `dispute_flags` row
+   - Checks if `flags > (group member count / 2)` → if so, sets `disputes.status = 'open'`, sets `markets.status = 'disputed'`, inserts notification to all group members
 
--- Normalize all statuses to lowercase
-UPDATE verdicts SET status = lower(status) WHERE status != lower(status);
+2. `cast_dispute_vote(_dispute_id, _user_id, _vote)`:
+   - Validates user is in group, dispute is open, user hasn't voted
+   - Inserts `dispute_votes` row
+   - Counts votes; when > 50% of group members have voted with a majority:
+     - If majority matches original verdict: set dispute status = `upheld`, judge integrity +5% (capped at 1.0), distribute coins as original
+     - If majority differs: set dispute status = `overturned`, update verdict status to `overturned`, judge integrity -15%, reverse and redistribute coins
+     - Set market status back to `resolved`
+     - Insert resolution notification to all group members
 
--- Prevent future casing issues
-ALTER TABLE verdicts ADD CONSTRAINT verdicts_status_check
-  CHECK (status IN ('pending', 'committed', 'overturned'));
+**Enable Supabase Realtime** on `dispute_votes` and `dispute_flags` for live tally updates.
 
--- Prevent duplicate judge assignments per market
-ALTER TABLE verdicts ADD CONSTRAINT verdicts_market_id_unique UNIQUE (market_id);
+### New Pages & Components
 
--- Backfill: resolve any closed markets with committed verdicts
-UPDATE markets SET status = 'resolved'
-WHERE status = 'closed'
-  AND id IN (SELECT market_id FROM verdicts WHERE status = 'committed');
-```
+1. **`src/pages/DisputeRevote.tsx`** — `/group/:groupId/dispute/:disputeId`
+   - Route added to App.tsx
+   - Shows: disputed verdict card (judge name, original YES/NO, integrity score), "What actually happened?" YES/NO buttons, live tally of group member votes (with avatars, names, and vote status), coins locked indicator
+   - Uses Supabase realtime subscription on `dispute_votes` for live updates
+   - Calls `cast_dispute_vote` RPC on vote
 
-#### 2. Sort markets: open first, closed/resolved at bottom
-In `Group.tsx`:
-- **Group markets**: Sort open markets first, then closed/resolved at the bottom, each sub-sorted by `created_at` desc
-- **Public markets**: Remove the `.eq("status", "open")` filter so closed public markets are included; apply the same status-aware sort (open on top, closed at bottom)
+2. **Update `src/pages/Group.tsx` — settled market cards:**
+   - For resolved markets with committed verdict within 12h: show "Flag this verdict" button
+   - Query `dispute_flags` to show current flag count and whether user already flagged
+   - For markets with status `disputed`: show "Disputed" badge and link to re-vote screen
+   - Call `flag_verdict` RPC on flag button click
 
-```text
-Sort order within each section:
-  1. open (newest first)
-  2. closed (newest first)  
-  3. resolved (newest first)
-```
+3. **Update `src/components/RevealCeremony.tsx`:**
+   - In State 3 (verdict view), add flag section at bottom: judge info card, flag progress bar, "Flag this verdict" button
+   - Show "You've flagged this verdict" if user already flagged
+   - Show dispute status if threshold reached
 
-#### 3. Files modified
-- **Migration**: Clean duplicates, add constraints, normalize data
-- **`src/pages/Group.tsx`**: Status-aware sorting for both group and public market lists; remove `status=open` filter from public markets query
+### Files to create/modify
+- **New migration**: `dispute_flags` table, `dispute_votes` table, alter `disputes`, two RPCs, realtime enablement
+- **New file**: `src/pages/DisputeRevote.tsx`
+- **Modified**: `src/App.tsx` (add route)
+- **Modified**: `src/pages/Group.tsx` (flag button on settled cards, disputed badge, link to re-vote)
+- **Modified**: `src/components/RevealCeremony.tsx` (flag section in verdict view)
+
+### UI Design (matching uploaded mockups)
+- Settled market card: verdict badge (YES WON / NO WON or Disputed), judge info with integrity score, flag progress bar (`X / Y flags`), "Flag this verdict" / "You've flagged" button
+- Re-vote screen: header "Community re-vote triggered", original verdict card with judge name + integrity, YES/NO vote buttons, live member vote tally list (avatar + name + vote/waiting), coins locked banner, "Cast your vote" CTA
+- Color scheme: dispute/flag elements use the existing `coin` (amber/orange) color tokens for warnings, `no` (red) for disputed state
 
