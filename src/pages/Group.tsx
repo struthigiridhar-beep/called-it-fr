@@ -123,7 +123,7 @@ export default function Group() {
     },
   });
 
-  // Fetch public markets
+  // Fetch public markets (all statuses)
   const { data: publicMarkets = [] } = useQuery({
     queryKey: ["public-markets"],
     queryFn: async () => {
@@ -131,8 +131,7 @@ export default function Group() {
         .from("markets")
         .select("*")
         .eq("is_public", true)
-        .eq("status", "open")
-        .order("yes_pool", { ascending: false });
+        .order("created_at", { ascending: false });
       return (data ?? []) as MarketRow[];
     },
   });
