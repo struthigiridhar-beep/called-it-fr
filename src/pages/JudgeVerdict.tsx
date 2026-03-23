@@ -161,7 +161,6 @@ export default function JudgeVerdict() {
       queryClient.invalidateQueries({ queryKey: ["group-markets"] });
       queryClient.invalidateQueries({ queryKey: ["group-market-verdicts"] });
       setShowCeremony(true);
-      toast.success("Verdict committed!");
     } catch (err: any) {
       toast.error(err.message ?? "Failed to commit verdict");
     } finally {
