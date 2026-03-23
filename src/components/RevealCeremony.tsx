@@ -39,6 +39,7 @@ export default function RevealCeremony({
 }: RevealCeremonyProps) {
   const { user } = useAuth();
   const uid = user?.id;
+  const queryClient = useQueryClient();
   const [state, setState] = useState<CeremonyState>(initialState);
   const [verdictIncoming, setVerdictIncoming] = useState(false);
 
