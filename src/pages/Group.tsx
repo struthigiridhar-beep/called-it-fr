@@ -525,11 +525,37 @@ export default function Group() {
         })()}
 
         {isResolved && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setRevealMarketId(m.id)}
+              className="w-full h-11 rounded-button text-sm font-semibold bg-bg-2 border border-b-0 text-t-1 active:scale-[0.97] transition-all"
+            >
+              View result
+            </button>
+            {canFlag && !hasFlagged && (
+              <button
+                onClick={() => verdictRow && handleFlag(verdictRow.id)}
+                className="w-full h-9 rounded-button text-xs font-semibold bg-no-bg border border-no-border text-no flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all"
+              >
+                <Flag className="h-3 w-3" />
+                Flag this verdict ({disputeRow?.flags ?? 0}/{flagThreshold})
+              </button>
+            )}
+            {canFlag && hasFlagged && (
+              <p className="text-xs text-t-2 text-center">
+                You've flagged this verdict ({disputeRow?.flags ?? 0}/{flagThreshold})
+              </p>
+            )}
+          </div>
+        )}
+
+        {isDisputed && disputeRow && (
           <button
-            onClick={() => setRevealMarketId(m.id)}
-            className="w-full h-11 rounded-button text-sm font-semibold bg-bg-2 border border-b-0 text-t-1 active:scale-[0.97] transition-all"
+            onClick={() => navigate(`/group/${groupId}/dispute/${disputeRow.id}`)}
+            className="w-full h-11 rounded-button text-sm font-semibold bg-no-bg border border-no-border text-no flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
           >
-            View result
+            <AlertTriangle className="h-4 w-4" />
+            Join re-vote →
           </button>
         )}
 
