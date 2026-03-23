@@ -312,6 +312,10 @@ export default function Group() {
         )
       : 0;
 
+    const isResolved = m.status === "resolved";
+    const isClosed = m.status === "closed";
+    const verdictRow = marketVerdicts.find((v) => v.market_id === m.id);
+
     return (
       <div
         key={m.id}
@@ -330,14 +334,30 @@ export default function Group() {
               {group?.name ?? "Group"}
             </span>
           )}
+          {isResolved && verdictRow?.verdict && (
+            <span className={`inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-bold ${
+              verdictRow.verdict === "yes"
+                ? "bg-yes-bg border border-yes-border text-yes"
+                : "bg-no-bg border border-no-border text-no"
+            }`}>
+              Verdict: {verdictRow.verdict.toUpperCase()}
+            </span>
+          )}
+          {isClosed && !isResolved && (
+            <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-coin-bg border border-coin-border text-coin">
+              Closed · awaiting verdict
+            </span>
+          )}
           {isFirstBet && (
             <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-[#0E1820] border border-[#1E3048] text-[#7B9EC8]">
               Your first bet
             </span>
           )}
-          <span className="text-xs text-t-2 ml-auto">
-            closes {formatDeadline(m.deadline)}
-          </span>
+          {!isResolved && !isClosed && (
+            <span className="text-xs text-t-2 ml-auto">
+              closes {formatDeadline(m.deadline)}
+            </span>
+          )}
         </div>
 
         {/* Question */}
@@ -352,26 +372,41 @@ export default function Group() {
         <div className="flex items-center justify-between text-xs text-t-2">
           <span className="font-mono-num font-semibold text-yes">{yesPct}%</span>
           <span className="font-mono-num">
-            {total.toLocaleString()} c · {formatDeadline(m.deadline)}
+            {total.toLocaleString()} c
           </span>
           <span className="font-mono-num font-semibold text-no">{noPct}%</span>
         </div>
 
-        {/* YES / NO buttons */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Buttons: depend on status */}
+        {m.status === "open" && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => openSheet(m, "yes")}
+              className="h-11 rounded-button text-sm font-semibold bg-yes-bg border border-yes-border text-yes active:scale-[0.97] transition-all"
+            >
+              YES
+            </button>
+            <button
+              onClick={() => openSheet(m, "no")}
+              className="h-11 rounded-button text-sm font-semibold bg-no-bg border border-no-border text-no active:scale-[0.97] transition-all"
+            >
+              NO
+            </button>
+          </div>
+        )}
+
+        {(isClosed || isResolved) && (
           <button
-            onClick={() => openSheet(m, "yes")}
-            className="h-11 rounded-button text-sm font-semibold bg-yes-bg border border-yes-border text-yes active:scale-[0.97] transition-all"
+            onClick={() => setRevealMarketId(m.id)}
+            className={`w-full h-11 rounded-button text-sm font-semibold active:scale-[0.97] transition-all ${
+              isResolved
+                ? "bg-bg-2 border border-b-0 text-t-1"
+                : "bg-coin-bg border border-coin-border text-coin"
+            }`}
           >
-            YES
+            {isResolved ? "View result" : "Reveal →"}
           </button>
-          <button
-            onClick={() => openSheet(m, "no")}
-            className="h-11 rounded-button text-sm font-semibold bg-no-bg border border-no-border text-no active:scale-[0.97] transition-all"
-          >
-            NO
-          </button>
-        </div>
+        )}
 
         {/* Position row */}
         {position && (
@@ -380,7 +415,7 @@ export default function Group() {
               Your position: {position.side.toUpperCase()} · {position.amount} c
             </span>
             <span className="font-mono-num font-semibold text-coin">
-              ~{estReturn} c est.
+              {isResolved ? "" : `~${estReturn} c est.`}
             </span>
           </div>
         )}
