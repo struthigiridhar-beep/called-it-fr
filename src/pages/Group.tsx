@@ -395,16 +395,42 @@ export default function Group() {
           </div>
         )}
 
-        {(isClosed || isResolved) && (
+        {isClosed && !isResolved && (() => {
+          const isJudgeForMarket = pendingVerdicts.some((v) => v.id === m.id);
+          if (isJudgeForMarket) {
+            return (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => navigate(`/group/${groupId}/judge/${m.id}`)}
+                  className="h-11 rounded-button text-sm font-semibold bg-coin-bg border border-coin-border text-coin active:scale-[0.97] transition-all"
+                >
+                  Pass verdict
+                </button>
+                <button
+                  onClick={() => setRevealMarketId(m.id)}
+                  className="h-11 rounded-button text-sm font-semibold bg-bg-2 border border-b-0 text-t-1 active:scale-[0.97] transition-all"
+                >
+                  Reveal →
+                </button>
+              </div>
+            );
+          }
+          return (
+            <button
+              onClick={() => setRevealMarketId(m.id)}
+              className="w-full h-11 rounded-button text-sm font-semibold bg-coin-bg border border-coin-border text-coin active:scale-[0.97] transition-all"
+            >
+              Reveal →
+            </button>
+          );
+        })()}
+
+        {isResolved && (
           <button
             onClick={() => setRevealMarketId(m.id)}
-            className={`w-full h-11 rounded-button text-sm font-semibold active:scale-[0.97] transition-all ${
-              isResolved
-                ? "bg-bg-2 border border-b-0 text-t-1"
-                : "bg-coin-bg border border-coin-border text-coin"
-            }`}
+            className="w-full h-11 rounded-button text-sm font-semibold bg-bg-2 border border-b-0 text-t-1 active:scale-[0.97] transition-all"
           >
-            {isResolved ? "View result" : "Reveal →"}
+            View result
           </button>
         )}
 
