@@ -13,6 +13,7 @@ interface GroupCardData {
   memberCount: number;
   userRank: number;
   liveMarkets: number;
+  resolvedMarkets: number;
   streak: number;
   xpThisWeek: number;
   xp: number;
@@ -50,7 +51,7 @@ export default function Home() {
       const groupIds = memberships.map((m) => m.group_id);
 
       // Parallel fetches
-      const [groupsRes, allMembersRes, marketsRes, betsRes] = await Promise.all([
+      const [groupsRes, allMembersRes, marketsRes, betsRes, verdictsRes] = await Promise.all([
         supabase.from("groups").select("id, name").in("id", groupIds),
         supabase.from("group_members").select("group_id, user_id, xp").in("group_id", groupIds),
         supabase.from("markets").select("id, group_id, status").in("group_id", groupIds),
@@ -58,12 +59,18 @@ export default function Home() {
           .from("bets")
           .select("id, market_id, created_at, user_id, side, amount")
           .order("created_at", { ascending: false }),
+        supabase
+          .from("verdicts")
+          .select("market_id, verdict, status, committed_at")
+          .eq("status", "committed")
+          .order("committed_at", { ascending: false }),
       ]);
 
       const groupsMap = new Map((groupsRes.data ?? []).map((g) => [g.id, g]));
       const allMembers = allMembersRes.data ?? [];
       const markets = marketsRes.data ?? [];
       const bets = betsRes.data ?? [];
+      const verdicts = verdictsRes.data ?? [];
 
       // Get user names for activity
       const userIds = [...new Set(allMembers.map((m) => m.user_id))];
@@ -83,6 +90,7 @@ export default function Home() {
         const myMembership = memberships.find((m) => m.group_id === gid)!;
         const groupMembers = allMembers.filter((m) => m.group_id === gid);
         const liveMarkets = markets.filter((m) => m.group_id === gid && m.status === "open").length;
+        const resolvedMarkets = markets.filter((m) => m.group_id === gid && m.status === "resolved").length;
 
         // Rank by XP
         const sorted = [...groupMembers].sort((a, b) => b.xp - a.xp);
@@ -93,13 +101,21 @@ export default function Home() {
           initials: getInitials(usersMap.get(m.user_id) ?? "??"),
         }));
 
-        // Latest bet in this group
+        // Latest activity: bet or verdict
         const groupMarketIds = new Set(
           markets.filter((m) => m.group_id === gid).map((m) => m.id)
         );
         const latestBet = bets.find((b) => groupMarketIds.has(b.market_id));
+        const latestVerdict = verdicts.find((v) => groupMarketIds.has(v.market_id));
+
         let lastActivity: string | null = null;
-        if (latestBet) {
+        // Compare timestamps — show whichever is more recent
+        const betTime = latestBet ? new Date(latestBet.created_at).getTime() : 0;
+        const verdictTime = latestVerdict ? new Date(latestVerdict.committed_at).getTime() : 0;
+
+        if (verdictTime > betTime && latestVerdict) {
+          lastActivity = `Verdict → ${latestVerdict.verdict.toUpperCase()}`;
+        } else if (latestBet) {
           const betterName = usersMap.get(latestBet.user_id) ?? "Someone";
           const firstName = betterName.split(" ")[0];
           lastActivity = `${firstName} just bet ${latestBet.amount} coins`;
@@ -111,6 +127,7 @@ export default function Home() {
           memberCount: groupMembers.length,
           userRank: rank,
           liveMarkets,
+          resolvedMarkets,
           streak: myMembership.streak,
           xpThisWeek: 0, // Would need date filtering on transactions
           xp: myMembership.xp,
@@ -162,12 +179,19 @@ export default function Home() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="text-t-0 font-semibold text-[15px] truncate">{g.name}</span>
-                      {g.liveMarkets > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-yes shrink-0 ml-2">
-                          <span className="h-1.5 w-1.5 rounded-full bg-yes" />
-                          {g.liveMarkets} live
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        {g.liveMarkets > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-yes">
+                            <span className="h-1.5 w-1.5 rounded-full bg-yes" />
+                            {g.liveMarkets} live
+                          </span>
+                        )}
+                        {g.resolvedMarkets > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-t-2">
+                            {g.resolvedMarkets} resolved
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span className="text-xs text-t-2">
                       {g.memberCount} member{g.memberCount !== 1 ? "s" : ""} · you're #{g.userRank}

@@ -161,7 +161,6 @@ export default function JudgeVerdict() {
       queryClient.invalidateQueries({ queryKey: ["group-markets"] });
       queryClient.invalidateQueries({ queryKey: ["group-market-verdicts"] });
       setShowCeremony(true);
-      toast.success("Verdict committed!");
     } catch (err: any) {
       toast.error(err.message ?? "Failed to commit verdict");
     } finally {
@@ -219,8 +218,11 @@ export default function JudgeVerdict() {
 
           {/* Actions */}
           <div className="space-y-3">
-            <button className="w-full h-12 rounded-button bg-bg-2 border border-b-0 text-sm font-semibold text-t-1">
-              Share your verdict card
+            <button
+              onClick={() => setShowCeremony(true)}
+              className="w-full h-12 rounded-button bg-bg-2 border border-b-0 text-sm font-semibold text-t-1"
+            >
+              View verdict
             </button>
             <Link
               to={`/group/${groupId}`}
@@ -230,6 +232,16 @@ export default function JudgeVerdict() {
             </Link>
           </div>
         </div>
+        {showCeremony && groupId && marketId && (
+          <RevealCeremony
+            open={showCeremony}
+            onClose={() => setShowCeremony(false)}
+            marketId={marketId}
+            groupId={groupId}
+            groupName={group?.name ?? "Group"}
+            initialState={3}
+          />
+        )}
         <BottomNav />
       </div>
     );
@@ -384,7 +396,10 @@ export default function JudgeVerdict() {
       {showCeremony && groupId && marketId && (
         <RevealCeremony
           open={showCeremony}
-          onClose={() => setShowCeremony(false)}
+          onClose={() => {
+            setShowCeremony(false);
+            navigate(`/group/${groupId}`);
+          }}
           marketId={marketId}
           groupId={groupId}
           groupName={group?.name ?? "Group"}

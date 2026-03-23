@@ -162,12 +162,12 @@ export default function Group() {
     queryKey: ["pending-verdicts", groupId, uid],
     enabled: !!groupId && !!uid,
     queryFn: async () => {
-      // Get pending verdicts where user is the assigned judge
+      // Get only truly pending (uncommitted) verdicts for the banner
       const { data: verdicts } = await supabase
         .from("verdicts")
         .select("id, market_id")
         .eq("judge_id", uid!)
-        .in("status", ["pending", "committed"]);
+        .eq("status", "pending");
       if (!verdicts?.length) return [];
       // Get matching closed markets in this group
       const { data: markets } = await supabase
