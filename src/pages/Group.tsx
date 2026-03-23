@@ -10,7 +10,7 @@ import BetSheet from "@/components/BetSheet";
 import CreateMarketSheet from "@/components/CreateMarketSheet";
 import RevealCeremony from "@/components/RevealCeremony";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Flag, AlertTriangle } from "lucide-react";
 
 type Tab = "markets" | "feed" | "board" | "create";
 type Side = "yes" | "no";
