@@ -218,8 +218,13 @@ export default function JudgeVerdict() {
 
           {/* Actions */}
           <div className="space-y-3">
-            <button className="w-full h-12 rounded-button bg-bg-2 border border-b-0 text-sm font-semibold text-t-1">
-              Share your verdict card
+            <button
+              onClick={() => {
+                setRevealMarketId(marketId!);
+              }}
+              className="w-full h-12 rounded-button bg-bg-2 border border-b-0 text-sm font-semibold text-t-1"
+            >
+              View verdict
             </button>
             <Link
               to={`/group/${groupId}`}
