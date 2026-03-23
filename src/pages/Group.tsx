@@ -62,6 +62,7 @@ export default function Group() {
   const [sheetMarket, setSheetMarket] = useState<MarketRow | null>(null);
   const [sheetSide, setSheetSide] = useState<Side>("yes");
   const [createOpen, setCreateOpen] = useState(false);
+  const [revealMarketId, setRevealMarketId] = useState<string | null>(null);
 
   const uid = user?.id;
 
