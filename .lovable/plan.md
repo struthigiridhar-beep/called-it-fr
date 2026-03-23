@@ -1,44 +1,53 @@
 
 
-## Issues to Fix
+## Fix: Market not transitioning to "resolved" after verdict
 
-Three problems identified from the screenshots and code:
+### Root Cause
+The markets table RLS policy only allows `creator` to update: `auth.uid() = created_by`. When the **judge** (who is not the creator) commits a verdict and tries to set `status = 'resolved'`, the update silently fails. The market stays `closed` forever.
 
-### 1. Judge banner still shows "1 pending" after verdict committed
+### Plan
 
-**Root cause**: `pendingVerdicts` query (Group.tsx line 170) includes both `pending` AND `committed` statuses, and the market filter on line 177 checks `status = "closed"`. If the market didn't transition to `resolved` (race condition or failed update), the committed verdict still appears as "pending" in the banner.
+#### 1. Create a `resolve_market` database function (SECURITY DEFINER)
+A server-side function that:
+- Takes `_market_id` and `_judge_id` as params
+- Verifies there's a committed verdict for this market by this judge
+- Updates `markets.status` to `'resolved'`
+- Bypasses RLS safely since it validates the judge relationship
 
-**Fix in `Group.tsx`**:
-- Split the query: banner count should only count `status = "pending"` verdicts (not yet committed)
-- For the card dual-buttons, check verdicts with `status = "pending"` only — once committed, the market should be resolved and show "View result"
-- Banner text: change from "1 pending" to show actual pending count, and only show banner when there are truly pending (uncommitted) verdicts
+```sql
+CREATE OR REPLACE FUNCTION public.resolve_market(_market_id uuid, _judge_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Only resolve if this judge has a committed verdict for this market
+  IF EXISTS (
+    SELECT 1 FROM verdicts
+    WHERE market_id = _market_id
+      AND judge_id = _judge_id
+      AND status = 'committed'
+  ) THEN
+    UPDATE markets SET status = 'resolved' WHERE id = _market_id;
+  ELSE
+    RAISE EXCEPTION 'No committed verdict found for this judge and market';
+  END IF;
+END;
+$$;
+```
 
-### 2. JudgeVerdict committed view shows stale "Share your verdict card"
+#### 2. Update `JudgeVerdict.tsx` — use RPC instead of direct update
+Replace the client-side `supabase.from("markets").update(...)` with `supabase.rpc("resolve_market", { _market_id: market.id, _judge_id: uid })`.
 
-**Root cause**: After committing, `JudgeVerdict.tsx` line 173-236 shows a committed view with generic "Share your verdict card" and "Back to markets" buttons. The user expects the flow to either redirect back automatically or show a proper "View verdict" state.
+#### 3. Update `JudgeVerdict.tsx` — committed view improvements
+- Change "Share your verdict card" button text to "View verdict"
+- After ceremony close, auto-navigate back to group page
 
-**Fix in `JudgeVerdict.tsx`**:
-- After successful commit + ceremony close, navigate back to the group page automatically
-- The committed view (if revisited) should show "View verdict" instead of "Share your verdict card", and display the actual verdict outcome prominently
-
-### 3. Home screen doesn't reflect resolved markets / verdicts
-
-**Root cause**: Home.tsx line 85 only counts `status === "open"` markets for the "live" badge. There's no display of recently resolved markets or their verdict outcomes.
-
-**Fix in `Home.tsx`**:
-- Add a count or indicator for recently resolved markets (e.g., "1 resolved" or show the verdict outcome)
-- On the group card, show the latest verdict result (e.g., "Verdict → NO") as part of the activity line when the most recent activity is a verdict rather than a bet
-
-### 4. Multiple groups with pending verdicts
-
-**Current behavior**: The banner navigates to `pendingVerdicts[0]?.id` and shows one question. With multiple markets or groups this is incomplete.
-
-**Fix in `Group.tsx`**:
-- If multiple pending verdicts exist in the group, list them all (or show a count with the first question, and make the banner navigate to a list)
-- The banner should cycle through or stack multiple pending items
+#### 4. Update `Group.tsx` — handle verdict-aware CTA
+The current logic `isClosed && !isResolved` with `pendingVerdicts` check is correct once the market properly transitions to resolved. No additional changes needed here since the RPC fix will make the market go to `resolved` immediately.
 
 ### Files Modified
-- `src/pages/Group.tsx` — Fix pendingVerdicts query to only include `pending` status for banner; handle multiple verdicts
-- `src/pages/JudgeVerdict.tsx` — Auto-navigate back after ceremony; update committed view copy
-- `src/pages/Home.tsx` — Add resolved market / verdict display to group cards
+- **Migration**: Create `resolve_market` RPC function
+- `src/pages/JudgeVerdict.tsx` — Use RPC for market resolution; fix committed view copy; auto-navigate on ceremony close
 
