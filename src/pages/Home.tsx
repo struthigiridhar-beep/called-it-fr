@@ -89,6 +89,7 @@ export default function Home() {
         const myMembership = memberships.find((m) => m.group_id === gid)!;
         const groupMembers = allMembers.filter((m) => m.group_id === gid);
         const liveMarkets = markets.filter((m) => m.group_id === gid && m.status === "open").length;
+        const resolvedMarkets = markets.filter((m) => m.group_id === gid && m.status === "resolved").length;
 
         // Rank by XP
         const sorted = [...groupMembers].sort((a, b) => b.xp - a.xp);
