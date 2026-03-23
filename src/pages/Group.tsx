@@ -587,6 +587,20 @@ export default function Group() {
         groupName={group?.name ?? "Group"}
       />
 
+      {/* Reveal Ceremony */}
+      {revealMarketId && (
+        <RevealCeremony
+          open={!!revealMarketId}
+          onClose={() => setRevealMarketId(null)}
+          marketId={revealMarketId}
+          groupId={groupId!}
+          groupName={group?.name ?? "Group"}
+          initialState={
+            groupMarkets.find((m) => m.id === revealMarketId)?.status === "resolved" ? 3 : 1
+          }
+        />
+      )}
+
       <BottomNav />
     </div>
   );
