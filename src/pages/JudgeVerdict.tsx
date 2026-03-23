@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Shield, AlertTriangle, Check } from "lucide-react";
 import OddsBar from "@/components/OddsBar";
 import BottomNav from "@/components/BottomNav";
+import RevealCeremony from "@/components/RevealCeremony";
 import { toast } from "sonner";
 
 type VerdictChoice = "yes" | "no" | null;
@@ -19,6 +20,7 @@ export default function JudgeVerdict() {
 
   const [choice, setChoice] = useState<VerdictChoice>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showCeremony, setShowCeremony] = useState(false);
 
   // Fetch market
   const { data: market } = useQuery({
@@ -157,6 +159,8 @@ export default function JudgeVerdict() {
       queryClient.invalidateQueries({ queryKey: ["market"] });
       queryClient.invalidateQueries({ queryKey: ["pending-verdicts"] });
       queryClient.invalidateQueries({ queryKey: ["group-markets"] });
+      queryClient.invalidateQueries({ queryKey: ["group-market-verdicts"] });
+      setShowCeremony(true);
       toast.success("Verdict committed!");
     } catch (err: any) {
       toast.error(err.message ?? "Failed to commit verdict");
@@ -376,6 +380,17 @@ export default function JudgeVerdict() {
           </div>
         </div>
       </div>
+      {/* Reveal Ceremony */}
+      {showCeremony && groupId && marketId && (
+        <RevealCeremony
+          open={showCeremony}
+          onClose={() => setShowCeremony(false)}
+          marketId={marketId}
+          groupId={groupId}
+          groupName={group?.name ?? "Group"}
+          initialState={3}
+        />
+      )}
       <BottomNav />
     </div>
   );
