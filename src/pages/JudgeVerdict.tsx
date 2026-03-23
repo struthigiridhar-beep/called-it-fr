@@ -380,6 +380,17 @@ export default function JudgeVerdict() {
           </div>
         </div>
       </div>
+      {/* Reveal Ceremony */}
+      {showCeremony && groupId && marketId && (
+        <RevealCeremony
+          open={showCeremony}
+          onClose={() => setShowCeremony(false)}
+          marketId={marketId}
+          groupId={groupId}
+          groupName={group?.name ?? "Group"}
+          initialState={3}
+        />
+      )}
       <BottomNav />
     </div>
   );
