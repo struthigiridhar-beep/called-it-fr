@@ -127,6 +127,7 @@ export default function Home() {
           memberCount: groupMembers.length,
           userRank: rank,
           liveMarkets,
+          resolvedMarkets,
           streak: myMembership.streak,
           xpThisWeek: 0, // Would need date filtering on transactions
           xp: myMembership.xp,
