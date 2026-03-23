@@ -636,7 +636,9 @@ export default function Group() {
           groupId={groupId!}
           groupName={group?.name ?? "Group"}
           initialState={
-            groupMarkets.find((m) => m.id === revealMarketId)?.status === "resolved" ? 3 : 1
+            groupMarkets.find((m) => m.id === revealMarketId)?.status === "resolved"
+            || marketVerdicts.some((v) => v.market_id === revealMarketId && v.status === "committed")
+              ? 3 : 1
           }
         />
       )}
