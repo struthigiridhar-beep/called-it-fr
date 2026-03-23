@@ -106,12 +106,12 @@ export default function Group() {
     },
   });
 
-  // Fetch verdicts for resolved/closed markets in this group
+  // Fetch verdicts for resolved/closed markets (group + public)
   const { data: marketVerdicts = [] } = useQuery({
-    queryKey: ["group-market-verdicts", groupId],
-    enabled: !!groupId && groupMarkets.length > 0,
+    queryKey: ["group-market-verdicts", groupId, groupMarkets.length, publicMarkets.length],
+    enabled: (groupMarkets.length > 0 || publicMarkets.length > 0),
     queryFn: async () => {
-      const closedIds = groupMarkets
+      const closedIds = [...groupMarkets, ...publicMarkets]
         .filter((m) => m.status === "resolved" || m.status === "closed")
         .map((m) => m.id);
       if (!closedIds.length) return [];
