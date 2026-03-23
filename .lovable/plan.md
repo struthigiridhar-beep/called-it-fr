@@ -1,53 +1,30 @@
 
 
-## Fix: Market not transitioning to "resolved" after verdict
+## Fix: Split-brain market state + verdict-aware UI
 
-### Root Cause
-The markets table RLS policy only allows `creator` to update: `auth.uid() = created_by`. When the **judge** (who is not the creator) commits a verdict and tries to set `status = 'resolved'`, the update silently fails. The market stays `closed` forever.
+### Problem
+"Will it rain tomorrow?" has `verdict_status = committed` but `market_status = closed`. The `resolve_market` RPC exists but was never called for this market (the code change to call it was added after this verdict was already committed). Result: no "Pass verdict" (verdict isn't pending), no "View result" (market isn't resolved), just a useless "Reveal →".
 
 ### Plan
 
-#### 1. Create a `resolve_market` database function (SECURITY DEFINER)
-A server-side function that:
-- Takes `_market_id` and `_judge_id` as params
-- Verifies there's a committed verdict for this market by this judge
-- Updates `markets.status` to `'resolved'`
-- Bypasses RLS safely since it validates the judge relationship
-
+#### 1. Fix the existing stuck market via migration
+Run a one-time migration to resolve any markets that have committed verdicts but are still closed:
 ```sql
-CREATE OR REPLACE FUNCTION public.resolve_market(_market_id uuid, _judge_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  -- Only resolve if this judge has a committed verdict for this market
-  IF EXISTS (
-    SELECT 1 FROM verdicts
-    WHERE market_id = _market_id
-      AND judge_id = _judge_id
-      AND status = 'committed'
-  ) THEN
-    UPDATE markets SET status = 'resolved' WHERE id = _market_id;
-  ELSE
-    RAISE EXCEPTION 'No committed verdict found for this judge and market';
-  END IF;
-END;
-$$;
+UPDATE markets SET status = 'resolved'
+WHERE status = 'closed'
+  AND id IN (SELECT market_id FROM verdicts WHERE status = 'committed');
 ```
 
-#### 2. Update `JudgeVerdict.tsx` — use RPC instead of direct update
-Replace the client-side `supabase.from("markets").update(...)` with `supabase.rpc("resolve_market", { _market_id: market.id, _judge_id: uid })`.
+#### 2. Make Group.tsx CTA logic verdict-aware (defensive)
+Currently line 398-426 only checks `pendingVerdicts` (pending status) and falls through to a generic "Reveal →" for everything else closed. Add a check: if a committed verdict exists for the market, show "View result" even if market status is still `closed` (defensive against future split-brain).
 
-#### 3. Update `JudgeVerdict.tsx` — committed view improvements
-- Change "Share your verdict card" button text to "View verdict"
-- After ceremony close, auto-navigate back to group page
+In `renderMarketCard`, after the `isClosed && !isResolved` block:
+- Query all verdicts for group markets (not just pending ones) — add a `committedVerdicts` lookup
+- If market is closed AND has a committed verdict → show "View result" button (same as resolved)
+- If market is closed AND has a pending verdict assigned to user → show "Pass verdict" + "Reveal →"
+- If market is closed AND no verdict → show "Reveal →"
 
-#### 4. Update `Group.tsx` — handle verdict-aware CTA
-The current logic `isClosed && !isResolved` with `pendingVerdicts` check is correct once the market properly transitions to resolved. No additional changes needed here since the RPC fix will make the market go to `resolved` immediately.
-
-### Files Modified
-- **Migration**: Create `resolve_market` RPC function
-- `src/pages/JudgeVerdict.tsx` — Use RPC for market resolution; fix committed view copy; auto-navigate on ceremony close
+#### 3. Files modified
+- **Migration**: Fix stuck data + prevent future occurrences
+- **`src/pages/Group.tsx`**: Add `committedVerdicts` query; update CTA logic to handle committed-but-not-resolved state
 
