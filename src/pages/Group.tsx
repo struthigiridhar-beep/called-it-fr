@@ -394,6 +394,8 @@ export default function Group() {
     // Can flag if resolved, verdict committed, within 12h
     const canFlag = isResolved && verdictRow?.status === "committed" && verdictRow?.committed_at &&
       (new Date().getTime() - new Date(verdictRow.committed_at).getTime()) < 12 * 60 * 60 * 1000;
+
+    return (
       <div
         key={m.id}
         className="rounded-card border border-b-0 bg-bg-1 p-4 space-y-3"
