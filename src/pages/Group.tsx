@@ -106,12 +106,25 @@ export default function Group() {
     },
   });
 
-  // Fetch verdicts for resolved/closed markets in this group
-  const { data: marketVerdicts = [] } = useQuery({
-    queryKey: ["group-market-verdicts", groupId],
-    enabled: !!groupId && groupMarkets.length > 0,
+  // Fetch public markets (all statuses)
+  const { data: publicMarkets = [] } = useQuery({
+    queryKey: ["public-markets"],
     queryFn: async () => {
-      const closedIds = groupMarkets
+      const { data } = await supabase
+        .from("markets")
+        .select("*")
+        .eq("is_public", true)
+        .order("created_at", { ascending: false });
+      return (data ?? []) as MarketRow[];
+    },
+  });
+
+  // Fetch verdicts for resolved/closed markets (group + public)
+  const { data: marketVerdicts = [] } = useQuery({
+    queryKey: ["group-market-verdicts", groupId, groupMarkets.length, publicMarkets.length],
+    enabled: (groupMarkets.length > 0 || publicMarkets.length > 0),
+    queryFn: async () => {
+      const closedIds = [...groupMarkets, ...publicMarkets]
         .filter((m) => m.status === "resolved" || m.status === "closed")
         .map((m) => m.id);
       if (!closedIds.length) return [];
@@ -120,20 +133,6 @@ export default function Group() {
         .select("market_id, verdict, status")
         .in("market_id", closedIds);
       return data ?? [];
-    },
-  });
-
-  // Fetch public markets
-  const { data: publicMarkets = [] } = useQuery({
-    queryKey: ["public-markets"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("markets")
-        .select("*")
-        .eq("is_public", true)
-        .eq("status", "open")
-        .order("yes_pool", { ascending: false });
-      return (data ?? []) as MarketRow[];
     },
   });
 
@@ -220,10 +219,22 @@ export default function Group() {
     return sorted[0]?.market_id ?? null;
   })();
 
-  // Sort public markets: first bet pinned, then by total pool desc
+  // Status sort order: open first, then closed, then resolved/disputed
+  const statusOrder = (s: string) => s === "open" ? 0 : s === "closed" ? 1 : 2;
+
+  // Sort group markets: open first, closed/resolved at bottom
+  const sortedGroupMarkets = [...groupMarkets].sort((a, b) => {
+    const so = statusOrder(a.status) - statusOrder(b.status);
+    if (so !== 0) return so;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  // Sort public markets: first bet pinned, then by status, then by pool size
   const sortedPublicMarkets = [...publicMarkets].sort((a, b) => {
     if (a.id === firstBetMarketId) return -1;
     if (b.id === firstBetMarketId) return 1;
+    const so = statusOrder(a.status) - statusOrder(b.status);
+    if (so !== 0) return so;
     return (b.yes_pool + b.no_pool) - (a.yes_pool + a.no_pool);
   });
 
@@ -553,7 +564,7 @@ export default function Group() {
                   <h3 className="text-[10px] font-semibold uppercase tracking-wider text-t-2">
                     Your Group
                   </h3>
-                  {groupMarkets.map((m) => renderMarketCard(m, false))}
+                  {sortedGroupMarkets.map((m) => renderMarketCard(m, false))}
                 </div>
               )}
 
