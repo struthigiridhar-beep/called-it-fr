@@ -179,12 +179,19 @@ export default function Home() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="text-t-0 font-semibold text-[15px] truncate">{g.name}</span>
-                      {g.liveMarkets > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-yes shrink-0 ml-2">
-                          <span className="h-1.5 w-1.5 rounded-full bg-yes" />
-                          {g.liveMarkets} live
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        {g.liveMarkets > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-yes">
+                            <span className="h-1.5 w-1.5 rounded-full bg-yes" />
+                            {g.liveMarkets} live
+                          </span>
+                        )}
+                        {g.resolvedMarkets > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-t-2">
+                            {g.resolvedMarkets} resolved
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span className="text-xs text-t-2">
                       {g.memberCount} member{g.memberCount !== 1 ? "s" : ""} · you're #{g.userRank}
