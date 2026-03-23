@@ -69,6 +69,7 @@ export default function Home() {
       const allMembers = allMembersRes.data ?? [];
       const markets = marketsRes.data ?? [];
       const bets = betsRes.data ?? [];
+      const verdicts = verdictsRes.data ?? [];
 
       // Get user names for activity
       const userIds = [...new Set(allMembers.map((m) => m.user_id))];
