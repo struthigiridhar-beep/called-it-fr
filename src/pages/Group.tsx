@@ -10,7 +10,7 @@ import BetSheet from "@/components/BetSheet";
 import CreateMarketSheet from "@/components/CreateMarketSheet";
 import RevealCeremony from "@/components/RevealCeremony";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Flag, AlertTriangle } from "lucide-react";
 
 type Tab = "markets" | "feed" | "board" | "create";
 type Side = "yes" | "no";
@@ -119,20 +119,64 @@ export default function Group() {
     },
   });
 
-  // Fetch verdicts for resolved/closed markets (group + public)
+  // Fetch verdicts for resolved/closed/disputed markets (group + public)
   const { data: marketVerdicts = [] } = useQuery({
     queryKey: ["group-market-verdicts", groupId, groupMarkets.length, publicMarkets.length],
     enabled: (groupMarkets.length > 0 || publicMarkets.length > 0),
     queryFn: async () => {
       const closedIds = [...groupMarkets, ...publicMarkets]
-        .filter((m) => m.status === "resolved" || m.status === "closed")
+        .filter((m) => m.status === "resolved" || m.status === "closed" || m.status === "disputed")
         .map((m) => m.id);
       if (!closedIds.length) return [];
       const { data } = await supabase
         .from("verdicts")
-        .select("market_id, verdict, status")
+        .select("id, market_id, verdict, status, committed_at")
         .in("market_id", closedIds);
       return data ?? [];
+    },
+  });
+
+  // Fetch disputes for markets with verdicts
+  const { data: disputes = [] } = useQuery({
+    queryKey: ["group-disputes", marketVerdicts.length],
+    enabled: marketVerdicts.length > 0,
+    queryFn: async () => {
+      const verdictIds = marketVerdicts.map((v) => v.id);
+      if (!verdictIds.length) return [];
+      const { data } = await supabase
+        .from("disputes")
+        .select("id, verdict_id, status, flags")
+        .in("verdict_id", verdictIds);
+      return data ?? [];
+    },
+  });
+
+  // Fetch user's flags
+  const { data: userFlags = [] } = useQuery({
+    queryKey: ["user-dispute-flags", uid, disputes.length],
+    enabled: !!uid && disputes.length > 0,
+    queryFn: async () => {
+      const disputeIds = disputes.map((d) => d.id);
+      if (!disputeIds.length) return [];
+      const { data } = await supabase
+        .from("dispute_flags")
+        .select("dispute_id")
+        .eq("user_id", uid!)
+        .in("dispute_id", disputeIds);
+      return data ?? [];
+    },
+  });
+
+  // Group member count for flag threshold
+  const { data: memberCount = 0 } = useQuery({
+    queryKey: ["group-member-count", groupId],
+    enabled: !!groupId,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("group_members")
+        .select("user_id", { count: "exact", head: true })
+        .eq("group_id", groupId!);
+      return count ?? 0;
     },
   });
 
@@ -245,6 +289,23 @@ export default function Group() {
     setSheetOpen(true);
   };
 
+  const handleFlag = async (verdictId: string) => {
+    if (!uid) return;
+    try {
+      const { data, error } = await supabase.rpc("flag_verdict", {
+        _verdict_id: verdictId,
+        _user_id: uid,
+      });
+      if (error) throw error;
+      toast.success(`Flagged (${(data as any)?.flags}/${(data as any)?.threshold} needed)`);
+      queryClient.invalidateQueries({ queryKey: ["group-disputes"] });
+      queryClient.invalidateQueries({ queryKey: ["user-dispute-flags"] });
+      queryClient.invalidateQueries({ queryKey: ["group-markets"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to flag");
+    }
+  };
+
   const confirmBet = async (side: Side, amount: number) => {
     if (!sheetMarket || !uid) return;
 
@@ -326,6 +387,13 @@ export default function Group() {
     const isResolved = m.status === "resolved";
     const isClosed = m.status === "closed";
     const verdictRow = marketVerdicts.find((v) => v.market_id === m.id);
+    const isDisputed = m.status === "disputed";
+    const disputeRow = verdictRow ? disputes.find((d) => d.verdict_id === verdictRow.id) : null;
+    const hasFlagged = disputeRow ? userFlags.some((f) => f.dispute_id === disputeRow.id) : false;
+    const flagThreshold = Math.floor(memberCount / 2) + 1;
+    // Can flag if resolved, verdict committed, within 12h
+    const canFlag = isResolved && verdictRow?.status === "committed" && verdictRow?.committed_at &&
+      (new Date().getTime() - new Date(verdictRow.committed_at).getTime()) < 12 * 60 * 60 * 1000;
 
     return (
       <div
@@ -354,9 +422,15 @@ export default function Group() {
               Verdict: {verdictRow.verdict.toUpperCase()}
             </span>
           )}
-          {isClosed && !isResolved && (
+           {isClosed && !isResolved && !isDisputed && (
             <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-coin-bg border border-coin-border text-coin">
               Closed · awaiting verdict
+            </span>
+          )}
+          {isDisputed && (
+            <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-bold bg-no-bg border border-no-border text-no">
+              <AlertTriangle className="h-3 w-3" />
+              Disputed
             </span>
           )}
           {isFirstBet && (
@@ -364,7 +438,7 @@ export default function Group() {
               Your first bet
             </span>
           )}
-          {!isResolved && !isClosed && (
+          {!isResolved && !isClosed && !isDisputed && (
             <span className="text-xs text-t-2 ml-auto">
               closes {formatDeadline(m.deadline)}
             </span>
@@ -451,11 +525,37 @@ export default function Group() {
         })()}
 
         {isResolved && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setRevealMarketId(m.id)}
+              className="w-full h-11 rounded-button text-sm font-semibold bg-bg-2 border border-b-0 text-t-1 active:scale-[0.97] transition-all"
+            >
+              View result
+            </button>
+            {canFlag && !hasFlagged && (
+              <button
+                onClick={() => verdictRow && handleFlag(verdictRow.id)}
+                className="w-full h-9 rounded-button text-xs font-semibold bg-no-bg border border-no-border text-no flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all"
+              >
+                <Flag className="h-3 w-3" />
+                Flag this verdict ({disputeRow?.flags ?? 0}/{flagThreshold})
+              </button>
+            )}
+            {canFlag && hasFlagged && (
+              <p className="text-xs text-t-2 text-center">
+                You've flagged this verdict ({disputeRow?.flags ?? 0}/{flagThreshold})
+              </p>
+            )}
+          </div>
+        )}
+
+        {isDisputed && disputeRow && (
           <button
-            onClick={() => setRevealMarketId(m.id)}
-            className="w-full h-11 rounded-button text-sm font-semibold bg-bg-2 border border-b-0 text-t-1 active:scale-[0.97] transition-all"
+            onClick={() => navigate(`/group/${groupId}/dispute/${disputeRow.id}`)}
+            className="w-full h-11 rounded-button text-sm font-semibold bg-no-bg border border-no-border text-no flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
           >
-            View result
+            <AlertTriangle className="h-4 w-4" />
+            Join re-vote →
           </button>
         )}
 
