@@ -109,13 +109,7 @@ export default function Home() {
         const latestVerdict = verdicts.find((v) => groupMarketIds.has(v.market_id));
 
         let lastActivity: string | null = null;
-        // Compare timestamps — show whichever is more recent
-        const betTime = latestBet ? new Date(latestBet.created_at).getTime() : 0;
-        const verdictTime = latestVerdict ? new Date(latestVerdict.committed_at).getTime() : 0;
-
-        if (verdictTime > betTime && latestVerdict) {
-          lastActivity = `Verdict → ${latestVerdict.verdict.toUpperCase()}`;
-        } else if (latestBet) {
+        if (latestBet) {
           const betterName = usersMap.get(latestBet.user_id) ?? "Someone";
           const firstName = betterName.split(" ")[0];
           lastActivity = `${firstName} just bet ${latestBet.amount} coins`;
