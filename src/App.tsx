@@ -36,7 +36,6 @@ const App = () => (
               <Route path="/group/:groupId/judge/:marketId" element={<JudgeVerdict />} />
               <Route path="/group/:groupId/dispute/:disputeId" element={<DisputeRevote />} />
               <Route path="/profile" element={<Profile />} />
-              <Route path="/notifications" element={<Notifications />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
