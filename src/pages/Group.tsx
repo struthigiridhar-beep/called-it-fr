@@ -691,6 +691,42 @@ export default function Group() {
         />
       )}
 
+      {/* Admin resolve sheet for public markets */}
+      <Sheet open={!!resolveMarket} onOpenChange={(open) => !open && setResolveMarket(null)}>
+        <SheetContent side="bottom" className="bg-bg-0 border-t border-b-1 rounded-t-[20px] px-6 pb-8">
+          <SheetHeader className="text-left">
+            <SheetTitle className="text-t-0 text-base font-bold">Resolve Market</SheetTitle>
+            <SheetDescription className="text-t-2 text-sm">
+              {resolveMarket?.question}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between text-xs text-t-2">
+              <span>Total pool</span>
+              <span className="font-mono-num font-semibold text-coin">
+                {((resolveMarket?.yes_pool ?? 0) + (resolveMarket?.no_pool ?? 0)).toLocaleString()} c
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                disabled={resolving}
+                onClick={() => resolveMarket && handleAdminResolve(resolveMarket, "yes")}
+                className="h-12 rounded-button text-sm font-bold bg-yes-bg border border-yes-border text-yes active:scale-[0.97] transition-all disabled:opacity-50"
+              >
+                YES wins
+              </button>
+              <button
+                disabled={resolving}
+                onClick={() => resolveMarket && handleAdminResolve(resolveMarket, "no")}
+                className="h-12 rounded-button text-sm font-bold bg-no-bg border border-no-border text-no active:scale-[0.97] transition-all disabled:opacity-50"
+              >
+                NO wins
+              </button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <BottomNav />
     </div>
   );
