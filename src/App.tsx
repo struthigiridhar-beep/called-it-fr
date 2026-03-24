@@ -13,7 +13,6 @@ import JudgeVerdict from "@/pages/JudgeVerdict";
 import DisputeRevote from "@/pages/DisputeRevote";
 
 import Profile from "@/pages/Profile";
-import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
