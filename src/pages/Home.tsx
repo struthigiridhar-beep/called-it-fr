@@ -95,12 +95,11 @@ export default function Home() {
           initials: getInitials(usersMap.get(m.user_id) ?? "??"),
         }));
 
-        // Latest activity: bet or verdict
+        // Latest activity: most recent bet
         const groupMarketIds = new Set(
           markets.filter((m) => m.group_id === gid).map((m) => m.id)
         );
         const latestBet = bets.find((b) => groupMarketIds.has(b.market_id));
-        const latestVerdict = verdicts.find((v) => groupMarketIds.has(v.market_id));
 
         let lastActivity: string | null = null;
         if (latestBet) {
