@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
 import { format } from "date-fns";
@@ -11,6 +11,12 @@ import CreateMarketSheet from "@/components/CreateMarketSheet";
 import RevealCeremony from "@/components/RevealCeremony";
 import { toast } from "sonner";
 import { Plus, Flag, AlertTriangle } from "lucide-react";
+import { useGroupMarkets } from "@/hooks/useGroupMarkets";
+import { useUserBalance } from "@/hooks/useUserBalance";
+import { useJudgeAssignment } from "@/hooks/useJudgeAssignment";
+import { useGroupFeed } from "@/hooks/useGroupFeed";
+import { useGroupLeaderboard, type LeaderboardEntry } from "@/hooks/useGroupLeaderboard";
+import { useQuery } from "@tanstack/react-query";
 
 type Tab = "markets" | "feed" | "board" | "create";
 type Side = "yes" | "no";
@@ -29,15 +35,6 @@ interface MarketRow {
   created_at: string;
   created_by: string | null;
   category: string;
-}
-
-interface BetRow {
-  id: string;
-  market_id: string;
-  side: "yes" | "no";
-  amount: number;
-  user_id: string;
-  created_at: string;
 }
 
 function getInitials(name: string) {
@@ -66,7 +63,7 @@ export default function Group() {
 
   const uid = user?.id;
 
-  // Fetch group info
+  // Group info (kept inline — single small query)
   const { data: group } = useQuery({
     queryKey: ["group-info", groupId],
     enabled: !!groupId,
@@ -76,121 +73,14 @@ export default function Group() {
     },
   });
 
-  // Fetch membership (coins)
-  const { data: membership } = useQuery({
-    queryKey: ["group-membership", groupId, uid],
-    enabled: !!groupId && !!uid,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("group_members")
-        .select("coins, xp, streak")
-        .eq("group_id", groupId!)
-        .eq("user_id", uid!)
-        .single();
-      return data;
-    },
-  });
+  // Custom hooks
+  const { markets: groupMarkets, publicMarkets, userBets, verdicts: marketVerdicts, disputes, userFlags, memberCount } = useGroupMarkets(groupId, uid);
+  const { balance: userCoins } = useUserBalance(uid, groupId);
+  const { pendingMarkets: pendingVerdicts } = useJudgeAssignment(groupId, uid);
+  const { events } = useGroupFeed(groupId);
+  const { leaderboard } = useGroupLeaderboard(groupId);
 
-  // Fetch group markets (private, all statuses for rendering)
-  const { data: groupMarkets = [] } = useQuery({
-    queryKey: ["group-markets", groupId],
-    enabled: !!groupId,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("markets")
-        .select("*")
-        .eq("group_id", groupId!)
-        .eq("is_public", false)
-        .order("created_at", { ascending: false });
-      return (data ?? []) as MarketRow[];
-    },
-  });
-
-  // Fetch public markets (all statuses)
-  const { data: publicMarkets = [] } = useQuery({
-    queryKey: ["public-markets"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("markets")
-        .select("*")
-        .eq("is_public", true)
-        .order("created_at", { ascending: false });
-      return (data ?? []) as MarketRow[];
-    },
-  });
-
-  // Fetch verdicts for resolved/closed/disputed markets (group + public)
-  const { data: marketVerdicts = [] } = useQuery({
-    queryKey: ["group-market-verdicts", groupId, groupMarkets.length, publicMarkets.length],
-    enabled: (groupMarkets.length > 0 || publicMarkets.length > 0),
-    queryFn: async () => {
-      const closedIds = [...groupMarkets, ...publicMarkets]
-        .filter((m) => m.status === "resolved" || m.status === "closed" || m.status === "disputed")
-        .map((m) => m.id);
-      if (!closedIds.length) return [];
-      const { data } = await supabase
-        .from("verdicts")
-        .select("id, market_id, verdict, status, committed_at")
-        .in("market_id", closedIds);
-      return data ?? [];
-    },
-  });
-
-  // Fetch disputes for markets with verdicts
-  const { data: disputes = [] } = useQuery({
-    queryKey: ["group-disputes", marketVerdicts.length],
-    enabled: marketVerdicts.length > 0,
-    queryFn: async () => {
-      const verdictIds = marketVerdicts.map((v) => v.id);
-      if (!verdictIds.length) return [];
-      const { data } = await supabase
-        .from("disputes")
-        .select("id, verdict_id, status, flags")
-        .in("verdict_id", verdictIds);
-      return data ?? [];
-    },
-  });
-
-  // Fetch user's flags
-  const { data: userFlags = [] } = useQuery({
-    queryKey: ["user-dispute-flags", uid, disputes.length],
-    enabled: !!uid && disputes.length > 0,
-    queryFn: async () => {
-      const disputeIds = disputes.map((d) => d.id);
-      if (!disputeIds.length) return [];
-      const { data } = await supabase
-        .from("dispute_flags")
-        .select("dispute_id")
-        .eq("user_id", uid!)
-        .in("dispute_id", disputeIds);
-      return data ?? [];
-    },
-  });
-
-  // Group member count for flag threshold
-  const { data: memberCount = 0 } = useQuery({
-    queryKey: ["group-member-count", groupId],
-    enabled: !!groupId,
-    queryFn: async () => {
-      const { count } = await supabase
-        .from("group_members")
-        .select("user_id", { count: "exact", head: true })
-        .eq("group_id", groupId!);
-      return count ?? 0;
-    },
-  });
-
-  // Fetch user bets
-  const { data: userBets = [] } = useQuery({
-    queryKey: ["user-bets", uid],
-    enabled: !!uid,
-    queryFn: async () => {
-      const { data } = await supabase.from("bets").select("*").eq("user_id", uid!);
-      return (data ?? []) as BetRow[];
-    },
-  });
-
-  // Fetch user data for first_bet_at
+  // User data for first_bet_at
   const { data: userData } = useQuery({
     queryKey: ["user-data", uid],
     enabled: !!uid,
@@ -200,80 +90,26 @@ export default function Group() {
     },
   });
 
-  // Judge banner: pending verdicts assigned to this user in this group
-  const { data: pendingVerdicts = [] } = useQuery({
-    queryKey: ["pending-verdicts", groupId, uid],
-    enabled: !!groupId && !!uid,
-    queryFn: async () => {
-      // Get only truly pending (uncommitted) verdicts for the banner
-      const { data: verdicts } = await supabase
-        .from("verdicts")
-        .select("id, market_id")
-        .eq("judge_id", uid!)
-        .eq("status", "pending");
-      if (!verdicts?.length) return [];
-      // Get matching closed markets in this group
-      const { data: markets } = await supabase
-        .from("markets")
-        .select("id, question, deadline")
-        .eq("group_id", groupId!)
-        .eq("status", "closed")
-        .in("id", verdicts.map((v) => v.market_id));
-      return (markets ?? []);
-    },
-  });
-
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["unread-notifications", uid],
-    enabled: !!uid,
-    queryFn: async () => {
-      const { count } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", uid!)
-        .eq("read", false);
-      return count ?? 0;
-    },
-  });
-
-  const userCoins = membership?.coins ?? 100;
-
-  // Build bet lookup: marketId -> { side, totalAmount }
-  const betsByMarket = new Map<string, { side: Side; amount: number }>();
-  userBets.forEach((b) => {
-    const existing = betsByMarket.get(b.market_id);
-    if (existing) {
-      existing.amount += b.amount;
-    } else {
-      betsByMarket.set(b.market_id, { side: b.side, amount: b.amount });
-    }
-  });
+  const betsByMarket = new Map(Object.entries(userBets));
 
   // First bet market detection
+  const rawUserBets = Object.entries(userBets).map(([marketId, bet]) => ({ market_id: marketId, ...bet }));
   const firstBetMarketId = (() => {
     if (!userData?.first_bet_at) return null;
-    const publicBets = userBets.filter((b) =>
+    const publicBetMarkets = rawUserBets.filter((b) =>
       publicMarkets.some((m) => m.id === b.market_id)
     );
-    if (!publicBets.length) return null;
-    // earliest bet
-    const sorted = [...publicBets].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-    return sorted[0]?.market_id ?? null;
+    return publicBetMarkets.length ? publicBetMarkets[0]?.market_id ?? null : null;
   })();
 
-  // Status sort order: open first, then closed, then resolved/disputed
   const statusOrder = (s: string) => s === "open" ? 0 : s === "closed" ? 1 : 2;
 
-  // Sort group markets: open first, closed/resolved at bottom
   const sortedGroupMarkets = [...groupMarkets].sort((a, b) => {
     const so = statusOrder(a.status) - statusOrder(b.status);
     if (so !== 0) return so;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  // Sort public markets: first bet pinned, then by status, then by pool size
   const sortedPublicMarkets = [...publicMarkets].sort((a, b) => {
     if (a.id === firstBetMarketId) return -1;
     if (b.id === firstBetMarketId) return 1;
@@ -309,7 +145,6 @@ export default function Group() {
   const confirmBet = async (side: Side, amount: number) => {
     if (!sheetMarket || !uid) return;
 
-    // Enforce one side per market
     const existingPosition = betsByMarket.get(sheetMarket.id);
     if (existingPosition && existingPosition.side !== side) {
       toast.error(`You already bet ${existingPosition.side.toUpperCase()}. You can only top up.`);
@@ -322,7 +157,6 @@ export default function Group() {
       return;
     }
     try {
-      // Insert bet
       const { error: betErr } = await supabase.from("bets").insert({
         market_id: sheetMarket.id,
         user_id: uid,
@@ -331,17 +165,13 @@ export default function Group() {
       });
       if (betErr) throw betErr;
 
-      // Update market pool
       const poolCol = side === "yes" ? "yes_pool" : "no_pool";
       const currentPool = side === "yes" ? sheetMarket.yes_pool : sheetMarket.no_pool;
-      // We need to use RPC or raw update — but market update policy requires created_by = uid
-      // For now update via supabase (may fail if RLS blocks non-creator updates)
       await supabase
         .from("markets")
         .update({ [poolCol]: currentPool + finalAmount })
         .eq("id", sheetMarket.id);
 
-      // Deduct coins
       const newBalance = Math.max(0, userCoins - finalAmount);
       await supabase
         .from("group_members")
@@ -349,7 +179,6 @@ export default function Group() {
         .eq("group_id", sheetMarket.group_id ?? groupId!)
         .eq("user_id", uid);
 
-      // Insert transaction
       await supabase.from("transactions").insert({
         user_id: uid,
         amount: -finalAmount,
@@ -357,7 +186,6 @@ export default function Group() {
         reference_id: sheetMarket.id,
       });
 
-      // Invalidate
       queryClient.invalidateQueries({ queryKey: ["group-markets"] });
       queryClient.invalidateQueries({ queryKey: ["public-markets"] });
       queryClient.invalidateQueries({ queryKey: ["user-bets"] });
@@ -391,25 +219,21 @@ export default function Group() {
     const disputeRow = verdictRow ? disputes.find((d) => d.verdict_id === verdictRow.id) : null;
     const hasFlagged = disputeRow ? userFlags.some((f) => f.dispute_id === disputeRow.id) : false;
     const flagThreshold = Math.floor(memberCount / 2) + 1;
-    // Can flag if resolved, verdict committed, within 12h
     const canFlag = isResolved && verdictRow?.status === "committed" && verdictRow?.committed_at &&
       (new Date().getTime() - new Date(verdictRow.committed_at).getTime()) < 12 * 60 * 60 * 1000;
 
     return (
-      <div
-        key={m.id}
-        className="rounded-card border border-b-0 bg-bg-1 p-4 space-y-3"
-      >
+      <div key={m.id} className="rounded-card border border-b-0 bg-bg-1 p-4 space-y-3">
         {/* Capsule row */}
         <div className="flex items-center gap-2 flex-wrap">
           {isPublic ? (
-            <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-[#0E1820] border border-[#1E3048] text-[#7B9EC8]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#7B9EC8]" />
+            <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-yes-bg border border-yes-border text-yes">
+              <span className="h-1.5 w-1.5 rounded-full bg-yes" />
               Public bet
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-[#272220] border border-[#38302A] text-[#9A8E84]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#9A8E84]/50" />
+            <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-bg-2 border border-b-1 text-t-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-t-2" />
               {group?.name ?? "Group"}
             </span>
           )}
@@ -422,7 +246,7 @@ export default function Group() {
               Verdict: {verdictRow.verdict.toUpperCase()}
             </span>
           )}
-           {isClosed && !isResolved && !isDisputed && (
+          {isClosed && !isResolved && !isDisputed && (
             <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-coin-bg border border-coin-border text-coin">
               Closed · awaiting verdict
             </span>
@@ -434,7 +258,7 @@ export default function Group() {
             </span>
           )}
           {isFirstBet && (
-            <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-[#0E1820] border border-[#1E3048] text-[#7B9EC8]">
+            <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-yes-bg border border-yes-border text-yes">
               Your first bet
             </span>
           )}
@@ -445,24 +269,16 @@ export default function Group() {
           )}
         </div>
 
-        {/* Question */}
-        <p className="text-[15px] font-semibold text-t-0 leading-snug">
-          {m.question}
-        </p>
+        <p className="text-[15px] font-semibold text-t-0 leading-snug">{m.question}</p>
 
-        {/* Odds bar */}
         <OddsBar yesPool={m.yes_pool} noPool={m.no_pool} />
 
-        {/* Stats row */}
         <div className="flex items-center justify-between text-xs text-t-2">
           <span className="font-mono-num font-semibold text-yes">{yesPct}%</span>
-          <span className="font-mono-num">
-            {total.toLocaleString()} c
-          </span>
+          <span className="font-mono-num">{total.toLocaleString()} c</span>
           <span className="font-mono-num font-semibold text-no">{noPct}%</span>
         </div>
 
-        {/* Buttons: depend on status */}
         {m.status === "open" && (
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -481,7 +297,6 @@ export default function Group() {
         )}
 
         {isClosed && !isResolved && (() => {
-          // Defensive: if a committed verdict exists, treat as resolved
           const hasCommittedVerdict = marketVerdicts.some(
             (v) => v.market_id === m.id && v.status === "committed"
           );
@@ -559,11 +374,10 @@ export default function Group() {
           </button>
         )}
 
-        {/* Position row */}
         {position && (
           <div className="flex items-center justify-between text-xs text-t-2 pt-1 border-t border-b-0">
             <span>
-              Your position: {position.side.toUpperCase()} · {position.amount} c
+              Your position: {position.side.toUpperCase()} · <span className="font-mono-num">{position.amount}</span> c
             </span>
             <span className="font-mono-num font-semibold text-coin">
               {isResolved ? "" : `~${estReturn} c est.`}
@@ -591,7 +405,6 @@ export default function Group() {
   return (
     <div className="min-h-[100dvh] bg-bg-0 flex flex-col">
       <div className="flex-1 overflow-y-auto pb-28">
-        {/* Tab bar */}
         <div className="sticky top-0 z-10 bg-bg-0 px-4 pt-4 space-y-3">
           <h2 className="text-lg font-bold text-t-0">{group?.name ?? "Group"}</h2>
 
@@ -626,11 +439,9 @@ export default function Group() {
           </div>
         </div>
 
-        {/* Tab content */}
         <div className="px-4 pt-4 space-y-4">
           {tab === "markets" && (
             <>
-              {/* Judge banner */}
               {pendingVerdicts.length > 0 && (
                 <button
                   onClick={() => navigate(`/group/${groupId}/judge/${pendingVerdicts[0]?.id}`)}
@@ -641,11 +452,9 @@ export default function Group() {
                       {getInitials(user?.email ?? "JU")}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-coin">
-                        You're the judge
-                      </p>
+                      <p className="text-sm font-semibold text-coin">You're the judge</p>
                       <p className="text-xs text-coin/70">
-                        Commit verdict → · {pendingVerdicts.length} pending
+                        Commit verdict → · <span className="font-mono-num">{pendingVerdicts.length}</span> pending
                       </p>
                     </div>
                     <span className="text-2xl font-bold font-mono-num text-coin">
@@ -658,25 +467,17 @@ export default function Group() {
                 </button>
               )}
 
-              {/* YOUR GROUP section */}
               {groupMarkets.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-t-2">
-                    Your Group
-                  </h3>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-t-2">Your Group</h3>
                   {sortedGroupMarkets.map((m) => renderMarketCard(m, false))}
                 </div>
               )}
 
-              {/* PUBLIC section */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-t-2">
-                    Public · everyone can bet
-                  </h3>
-                  <span className="rounded-pill px-2.5 py-1 text-[10px] font-semibold text-t-1 border border-b-1 bg-bg-2">
-                    Global
-                  </span>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-t-2">Public · everyone can bet</h3>
+                  <span className="rounded-pill px-2.5 py-1 text-[10px] font-semibold text-t-1 border border-b-1 bg-bg-2">Global</span>
                 </div>
                 {sortedPublicMarkets.map((m) => renderMarketCard(m, true))}
                 {sortedPublicMarkets.length === 0 && (
@@ -687,22 +488,53 @@ export default function Group() {
           )}
 
           {tab === "feed" && (
-            <div className="mt-4">
+            <div className="mt-4 space-y-3">
               <h3 className="text-base font-semibold text-t-0">Feed</h3>
-              <p className="text-sm text-t-1 mt-2">Nothing here yet.</p>
+              {events.length === 0 ? (
+                <p className="text-sm text-t-1">Nothing here yet.</p>
+              ) : (
+                events.map((e) => (
+                  <div key={e.id} className="rounded-card border border-b-0 bg-bg-1 p-3">
+                    <p className="text-xs text-t-2">{e.event_type}</p>
+                    <p className="text-sm text-t-0">{JSON.stringify(e.payload)}</p>
+                  </div>
+                ))
+              )}
             </div>
           )}
 
           {tab === "board" && (
-            <div className="mt-4">
+            <div className="mt-4 space-y-3">
               <h3 className="text-base font-semibold text-t-0">Leaderboard</h3>
-              <p className="text-sm text-t-1 mt-2">No data yet.</p>
+              {leaderboard.length === 0 ? (
+                <p className="text-sm text-t-1">No data yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  {leaderboard.map((entry, i) => (
+                    <div key={entry.user_id} className="flex items-center gap-3 rounded-card bg-bg-1 border border-b-0 p-3">
+                      <span className="text-sm font-bold font-mono-num text-t-2 w-6 text-center">{i + 1}</span>
+                      <div
+                        className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                        style={{ backgroundColor: entry.avatar_color }}
+                      >
+                        {getInitials(entry.name)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-t-0 truncate">{entry.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold font-mono-num text-coin">{entry.xp} XP</p>
+                        <p className="text-[10px] font-mono-num text-t-2">{entry.coins} c</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Bet sheet */}
       {sheetMarket && (
         <BetSheet
           open={sheetOpen}
@@ -730,7 +562,6 @@ export default function Group() {
         />
       )}
 
-      {/* Create market sheet */}
       <CreateMarketSheet
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -738,7 +569,6 @@ export default function Group() {
         groupName={group?.name ?? "Group"}
       />
 
-      {/* Reveal Ceremony */}
       {revealMarketId && (
         <RevealCeremony
           open={!!revealMarketId}

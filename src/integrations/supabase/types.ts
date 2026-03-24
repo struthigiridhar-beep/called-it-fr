@@ -175,9 +175,52 @@ export type Database = {
           },
         ]
       }
+      events: {
+        Row: {
+          created_at: string | null
+          event_type: string
+          group_id: string
+          id: string
+          payload: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_type: string
+          group_id: string
+          id?: string
+          payload: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string
+          group_id?: string
+          id?: string
+          payload?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_members: {
         Row: {
           coins: number
+          crew_role: string | null
           group_id: string
           joined_at: string
           judge_integrity: number
@@ -187,6 +230,7 @@ export type Database = {
         }
         Insert: {
           coins?: number
+          crew_role?: string | null
           group_id: string
           joined_at?: string
           judge_integrity?: number
@@ -196,6 +240,7 @@ export type Database = {
         }
         Update: {
           coins?: number
+          crew_role?: string | null
           group_id?: string
           joined_at?: string
           judge_integrity?: number
@@ -290,6 +335,48 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_nominations: {
+        Row: {
+          created_at: string | null
+          group_id: string
+          id: string
+          nominated_by: string
+          question_seed: string | null
+          trigger_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          group_id: string
+          id?: string
+          nominated_by: string
+          question_seed?: string | null
+          trigger_type: string
+        }
+        Update: {
+          created_at?: string | null
+          group_id?: string
+          id?: string
+          nominated_by?: string
+          question_seed?: string | null
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_nominations_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_nominations_nominated_by_fkey"
+            columns: ["nominated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -421,6 +508,52 @@ export type Database = {
           {
             foreignKeyName: "reactions_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          created_at: string | null
+          group_id: string
+          id: string
+          invitee_id: string
+          inviter_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          group_id: string
+          id?: string
+          invitee_id: string
+          inviter_id: string
+        }
+        Update: {
+          created_at?: string | null
+          group_id?: string
+          id?: string
+          invitee_id?: string
+          inviter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_invitee_id_fkey"
+            columns: ["invitee_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_inviter_id_fkey"
+            columns: ["inviter_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
