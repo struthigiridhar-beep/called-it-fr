@@ -15,6 +15,9 @@ import { useGroupMarkets } from "@/hooks/useGroupMarkets";
 import { useUserBalance } from "@/hooks/useUserBalance";
 import { useJudgeAssignment } from "@/hooks/useJudgeAssignment";
 import { useGroupFeed } from "@/hooks/useGroupFeed";
+import FeedCard from "@/components/FeedCard";
+import FeedReactions from "@/components/FeedReactions";
+import { isToday, isYesterday, format as fmtDate } from "date-fns";
 import { useGroupLeaderboard, type LeaderboardEntry } from "@/hooks/useGroupLeaderboard";
 import { useQuery } from "@tanstack/react-query";
 
@@ -77,7 +80,8 @@ export default function Group() {
   const { markets: groupMarkets, publicMarkets, userBets, verdicts: marketVerdicts, disputes, userFlags, memberCount } = useGroupMarkets(groupId, uid);
   const { balance: userCoins } = useUserBalance(uid, groupId);
   const { pendingMarkets: pendingVerdicts } = useJudgeAssignment(groupId, uid);
-  const { events } = useGroupFeed(groupId);
+  const { events, reactions, users: feedUsers } = useGroupFeed(groupId);
+  const feedUsersMap = new Map(feedUsers.map((u) => [u.id, u]));
   const { leaderboard } = useGroupLeaderboard(groupId);
 
   // User data for first_bet_at
@@ -488,18 +492,73 @@ export default function Group() {
           )}
 
           {tab === "feed" && (
-            <div className="mt-4 space-y-3">
-              <h3 className="text-base font-semibold text-t-0">Feed</h3>
+            <div className="mt-4 space-y-1">
               {events.length === 0 ? (
                 <p className="text-sm text-t-1">Nothing here yet.</p>
               ) : (
-                events.map((e) => (
-                  <div key={e.id} className="rounded-card border border-b-0 bg-bg-1 p-3">
-                    <p className="text-xs text-t-2">{e.event_type}</p>
-                    <p className="text-sm text-t-0">{JSON.stringify(e.payload)}</p>
-                  </div>
-                ))
+                (() => {
+                  let lastDateLabel = "";
+                  return events.map((e) => {
+                    const d = e.created_at ? new Date(e.created_at) : null;
+                    let dateLabel = "";
+                    if (d) {
+                      dateLabel = isToday(d) ? "Today" : isYesterday(d) ? "Yesterday" : fmtDate(d, "MMM d");
+                    }
+                    const showSeparator = dateLabel !== lastDateLabel;
+                    lastDateLabel = dateLabel;
+                    const eventReactions = reactions.filter((r) => r.target_id === e.id);
+
+                    return (
+                      <div key={e.id}>
+                        {showSeparator && dateLabel && (
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-t-2 pt-4 pb-2">
+                            {dateLabel}
+                          </p>
+                        )}
+                        <div className="rounded-card border border-b-0 bg-bg-1 p-3 space-y-2.5">
+                          <FeedCard
+                            event={e}
+                            users={feedUsersMap}
+                            onYes={(mId) => {
+                              const m = [...groupMarkets, ...publicMarkets].find((x) => x.id === mId);
+                              if (m) openSheet(m, "yes");
+                            }}
+                            onNo={(mId) => {
+                              const m = [...groupMarkets, ...publicMarkets].find((x) => x.id === mId);
+                              if (m) openSheet(m, "no");
+                            }}
+                          />
+                          <FeedReactions
+                            eventId={e.id}
+                            groupId={groupId!}
+                            reactions={eventReactions}
+                            userId={uid}
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()
               )}
+
+              {/* Compose bar */}
+              <div className="sticky bottom-20 pt-3">
+                <div className="flex items-center gap-2 rounded-card bg-bg-1 border border-b-1 p-2">
+                  <input
+                    type="text"
+                    placeholder="New market or roast…"
+                    className="flex-1 bg-transparent text-sm text-t-0 placeholder:text-t-2 outline-none px-2"
+                    readOnly
+                    onClick={() => setCreateOpen(true)}
+                  />
+                  <button
+                    onClick={() => setCreateOpen(true)}
+                    className="h-8 px-3 rounded-button text-xs font-semibold bg-yes-bg border border-yes-border text-yes active:scale-[0.97] transition-all"
+                  >
+                    + Market
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
