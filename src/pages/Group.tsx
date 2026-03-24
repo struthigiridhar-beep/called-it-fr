@@ -82,6 +82,7 @@ export default function Group() {
   const { pendingMarkets: pendingVerdicts } = useJudgeAssignment(groupId, uid);
   const { events, reactions, users: feedUsers } = useGroupFeed(groupId);
   const feedUsersMap = new Map(feedUsers.map((u) => [u.id, u]));
+  const { leaderboard } = useGroupLeaderboard(groupId);
 
   // User data for first_bet_at
   const { data: userData } = useQuery({
