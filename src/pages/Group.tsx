@@ -66,8 +66,11 @@ export default function Group() {
   const [sheetSide, setSheetSide] = useState<Side>("yes");
   const [createOpen, setCreateOpen] = useState(false);
   const [revealMarketId, setRevealMarketId] = useState<string | null>(null);
+  const [resolveMarket, setResolveMarket] = useState<MarketRow | null>(null);
+  const [resolving, setResolving] = useState(false);
 
   const uid = user?.id;
+  const isAdmin = user?.email === ADMIN_EMAIL;
 
   // Group info (kept inline — single small query)
   const { data: group } = useQuery({
