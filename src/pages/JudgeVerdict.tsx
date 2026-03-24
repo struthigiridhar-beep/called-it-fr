@@ -8,6 +8,7 @@ import OddsBar from "@/components/OddsBar";
 import BottomNav from "@/components/BottomNav";
 import RevealCeremony from "@/components/RevealCeremony";
 import { toast } from "sonner";
+import { useJudgeAssignment } from "@/hooks/useJudgeAssignment";
 
 type VerdictChoice = "yes" | "no" | null;
 
@@ -22,21 +23,19 @@ export default function JudgeVerdict() {
   const [submitting, setSubmitting] = useState(false);
   const [showCeremony, setShowCeremony] = useState(false);
 
-  // Fetch market
+  // Use hook for pending check (used by banner elsewhere)
+  const { pendingMarkets } = useJudgeAssignment(groupId, uid);
+
+  // Page-specific queries (not reusable)
   const { data: market } = useQuery({
     queryKey: ["market", marketId],
     enabled: !!marketId,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("markets")
-        .select("*")
-        .eq("id", marketId!)
-        .single();
+      const { data } = await supabase.from("markets").select("*").eq("id", marketId!).single();
       return data;
     },
   });
 
-  // Fetch group
   const { data: group } = useQuery({
     queryKey: ["group-info", groupId],
     enabled: !!groupId,
@@ -46,30 +45,20 @@ export default function JudgeVerdict() {
     },
   });
 
-  // Fetch verdict row
   const { data: verdict } = useQuery({
     queryKey: ["verdict", marketId, uid],
     enabled: !!marketId && !!uid,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("verdicts")
-        .select("*")
-        .eq("market_id", marketId!)
-        .eq("judge_id", uid!)
-        .single();
+      const { data } = await supabase.from("verdicts").select("*").eq("market_id", marketId!).eq("judge_id", uid!).single();
       return data;
     },
   });
 
-  // Fetch bets aggregate
   const { data: betsAgg } = useQuery({
     queryKey: ["bets-agg", marketId],
     enabled: !!marketId,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("bets")
-        .select("side, user_id")
-        .eq("market_id", marketId!);
+      const { data } = await supabase.from("bets").select("side, user_id").eq("market_id", marketId!);
       const rows = data ?? [];
       const yesUsers = new Set(rows.filter((b) => b.side === "yes").map((b) => b.user_id));
       const noUsers = new Set(rows.filter((b) => b.side === "no").map((b) => b.user_id));
@@ -77,38 +66,26 @@ export default function JudgeVerdict() {
     },
   });
 
-  // User's own bet on this market
   const { data: userBet } = useQuery({
     queryKey: ["user-bet", marketId, uid],
     enabled: !!marketId && !!uid,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("bets")
-        .select("side, amount")
-        .eq("market_id", marketId!)
-        .eq("user_id", uid!);
+      const { data } = await supabase.from("bets").select("side, amount").eq("market_id", marketId!).eq("user_id", uid!);
       if (!data?.length) return null;
       const total = data.reduce((s, b) => s + b.amount, 0);
       return { side: data[0].side, amount: total };
     },
   });
 
-  // Judge integrity
   const { data: membership } = useQuery({
     queryKey: ["judge-membership", groupId, uid],
     enabled: !!groupId && !!uid,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("group_members")
-        .select("judge_integrity")
-        .eq("group_id", groupId!)
-        .eq("user_id", uid!)
-        .single();
+      const { data } = await supabase.from("group_members").select("judge_integrity").eq("group_id", groupId!).eq("user_id", uid!).single();
       return data;
     },
   });
 
-  // Fetch judge user name
   const { data: judgeUser } = useQuery({
     queryKey: ["user-name", uid],
     enabled: !!uid,
@@ -141,15 +118,10 @@ export default function JudgeVerdict() {
     try {
       const { error } = await supabase
         .from("verdicts")
-        .update({
-          verdict: choice,
-          status: "committed",
-          committed_at: new Date().toISOString(),
-        })
+        .update({ verdict: choice, status: "committed", committed_at: new Date().toISOString() })
         .eq("id", verdict.id);
       if (error) throw error;
 
-      // Update market status to resolved via RPC (bypasses RLS)
       const { error: rpcError } = await supabase.rpc("resolve_market", {
         _market_id: market.id,
         _judge_id: uid,
@@ -169,12 +141,10 @@ export default function JudgeVerdict() {
     }
   };
 
-  // ─── Committed view ──────────────────────────────────────
   if (isCommitted) {
     return (
       <div className="min-h-[100dvh] bg-bg-0 flex flex-col">
         <div className="flex-1 overflow-y-auto pb-28 px-4 pt-4 space-y-5">
-          {/* Header */}
           <div className="flex items-center gap-3">
             <Link to={`/group/${groupId}`} className="text-t-2 hover:text-t-0">
               <ArrowLeft className="h-5 w-5" />
@@ -182,11 +152,10 @@ export default function JudgeVerdict() {
             <h1 className="text-lg font-bold text-t-0 flex-1">Verdict committed</h1>
             <div className="flex items-center gap-1.5 rounded-pill bg-success-bg border border-success-border px-2.5 py-1">
               <Shield className="h-3 w-3 text-success" />
-              <span className="text-xs font-semibold text-success">{integrityPct}%</span>
+              <span className="text-xs font-semibold font-mono-num text-success">{integrityPct}%</span>
             </div>
           </div>
 
-          {/* Your verdict card */}
           <div className="rounded-card border border-b-0 bg-bg-1 p-5 space-y-4 text-center">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-t-2">Your verdict</p>
             <div className={`text-5xl font-bold ${verdict.verdict === "yes" ? "text-yes" : "text-no"}`}>
@@ -196,11 +165,10 @@ export default function JudgeVerdict() {
             <div className="flex items-center justify-center gap-2 text-xs text-t-2">
               <span>Judge: {judgeUser?.name ?? "You"}</span>
               <span>·</span>
-              <span className="text-success">{integrityPct}% integrity</span>
+              <span className="text-success font-mono-num">{integrityPct}% integrity</span>
             </div>
           </div>
 
-          {/* 12h flag window */}
           <div className="rounded-card border border-b-0 bg-bg-1 p-4 space-y-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-t-2">12h flag window</p>
             <div className="flex items-center justify-between text-sm">
@@ -217,7 +185,6 @@ export default function JudgeVerdict() {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="space-y-3">
             <button
               onClick={() => setShowCeremony(true)}
@@ -248,11 +215,9 @@ export default function JudgeVerdict() {
     );
   }
 
-  // ─── Voting view ──────────────────────────────────────────
   return (
     <div className="min-h-[100dvh] bg-bg-0 flex flex-col">
       <div className="flex-1 overflow-y-auto pb-28 px-4 pt-4 space-y-5">
-        {/* Header */}
         <div className="flex items-center gap-3">
           <Link to={`/group/${groupId}`} className="text-t-2 hover:text-t-0">
             <ArrowLeft className="h-5 w-5" />
@@ -263,11 +228,10 @@ export default function JudgeVerdict() {
           </div>
           <div className="flex items-center gap-1.5 rounded-pill bg-success-bg border border-success-border px-2.5 py-1">
             <Shield className="h-3 w-3 text-success" />
-            <span className="text-xs font-semibold text-success">{integrityPct}%</span>
+            <span className="text-xs font-semibold font-mono-num text-success">{integrityPct}%</span>
           </div>
         </div>
 
-        {/* Assignment badge */}
         <div className="rounded-card border border-b-0 bg-bg-1 p-4 space-y-2">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-yes-bg border border-yes-border text-yes">
@@ -280,7 +244,6 @@ export default function JudgeVerdict() {
           </div>
         </div>
 
-        {/* Market card */}
         <div className="rounded-card border border-b-0 bg-bg-1 p-4 space-y-3">
           <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium bg-coin-bg border border-coin-border text-coin">
             Market closed · awaiting verdict
@@ -290,21 +253,18 @@ export default function JudgeVerdict() {
           <div className="flex items-center justify-between text-xs text-t-2">
             <span>
               <span className="font-mono-num font-semibold text-yes">{yesPct}%</span>
-              <span className="ml-1">· {betsAgg?.yesBettors ?? 0} bettors</span>
+              <span className="ml-1">· <span className="font-mono-num">{betsAgg?.yesBettors ?? 0}</span> bettors</span>
             </span>
             <span className="font-mono-num">{total.toLocaleString()} c</span>
             <span>
               <span className="font-mono-num font-semibold text-no">{noPct}%</span>
-              <span className="ml-1">· {betsAgg?.noBettors ?? 0} bettors</span>
+              <span className="ml-1">· <span className="font-mono-num">{betsAgg?.noBettors ?? 0}</span> bettors</span>
             </span>
           </div>
         </div>
 
-        {/* Conflict status */}
         <div className={`rounded-card border p-4 flex items-center gap-3 ${
-          hasConflict
-            ? "bg-coin-bg border-coin-border"
-            : "bg-success-bg border-success-border"
+          hasConflict ? "bg-coin-bg border-coin-border" : "bg-success-bg border-success-border"
         }`}>
           {hasConflict ? (
             <>
@@ -312,7 +272,7 @@ export default function JudgeVerdict() {
               <div>
                 <p className="text-sm font-semibold text-coin">Conflict noted</p>
                 <p className="text-xs text-coin/70">
-                  You bet {userBet.amount} c on {userBet.side.toUpperCase()} · stake frozen until verdict
+                  You bet <span className="font-mono-num">{userBet.amount}</span> c on {userBet.side.toUpperCase()} · stake frozen until verdict
                 </p>
               </div>
             </>
@@ -327,7 +287,6 @@ export default function JudgeVerdict() {
           )}
         </div>
 
-        {/* YES / NO verdict buttons */}
         <div className="space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-t-2">Your verdict</p>
           <div className="grid grid-cols-2 gap-2">
@@ -339,7 +298,7 @@ export default function JudgeVerdict() {
                   : "bg-bg-2 border border-b-0 text-t-2 hover:text-t-1"
               }`}
             >
-              YES — {yesPct}%
+              YES — <span className="font-mono-num">{yesPct}%</span>
             </button>
             <button
               onClick={() => setChoice("no")}
@@ -349,12 +308,11 @@ export default function JudgeVerdict() {
                   : "bg-bg-2 border border-b-0 text-t-2 hover:text-t-1"
               }`}
             >
-              NO — {noPct}%
+              NO — <span className="font-mono-num">{noPct}%</span>
             </button>
           </div>
         </div>
 
-        {/* Confirm button */}
         <button
           onClick={handleCommit}
           disabled={!choice || submitting}
@@ -371,7 +329,6 @@ export default function JudgeVerdict() {
             : "Select YES or NO to commit"}
         </button>
 
-        {/* How judging works */}
         <div className="rounded-card border border-b-0 bg-bg-1 p-4 space-y-4">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-t-2">How judging works</p>
           <div className="space-y-3">
@@ -393,7 +350,6 @@ export default function JudgeVerdict() {
           </div>
         </div>
       </div>
-      {/* Reveal Ceremony */}
       {showCeremony && groupId && marketId && (
         <RevealCeremony
           open={showCeremony}

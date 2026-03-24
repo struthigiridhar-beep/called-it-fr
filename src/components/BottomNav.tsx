@@ -1,26 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutGrid, Home as HomeIcon, Bell, User, LogOut } from "lucide-react";
+import { LayoutGrid, Bell, User, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useNotifications } from "@/hooks/useNotifications";
 
 export default function BottomNav() {
   const { user, signOut } = useAuth();
   const location = useLocation();
-
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["unread-notifications", user?.id],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      const { count } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user!.id)
-        .eq("read", false);
-      return count ?? 0;
-    },
-    staleTime: 15_000,
-  });
+  const { unreadCount } = useNotifications(user?.id);
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + "/");
 
