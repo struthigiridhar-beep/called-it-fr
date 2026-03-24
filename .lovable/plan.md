@@ -1,44 +1,65 @@
 
 
-## Fix: Feed is empty + Remove Alerts section
+## Group Feed — Rich Event Rendering + Live Reactions
 
-### Root Cause
-The feed reads from the `events` table, but **nothing ever writes to it**. The `events` table has no INSERT RLS policy (users can't insert), and no application code or database trigger inserts rows. All activity (bets, verdicts, disputes, market creation) writes to `notifications` but never to `events`.
+### Current State
+- `useGroupFeed` fetches from `events` table with realtime subscription — good foundation
+- `events` table has `event_type`, `payload` (jsonb), `user_id`, `group_id`, `created_at`
+- `reactions` table exists with `target_id`, `target_type`, `emoji`, `user_id` — already has RLS for insert/select/delete
+- Feed tab in Group.tsx currently renders raw JSON payload — needs full redesign
+- `ReactionPills.tsx` exists but uses hardcoded data — needs to be wired to Supabase
 
-### Solution
+### Approach
 
-**1. Database trigger to auto-populate `events` from actions**
+The feed doesn't need to query multiple tables. The `events` table already stores denormalized data in `payload`. We render each `event_type` with a distinct card layout. Reactions are fetched per-group-feed and matched by `target_id = event.id`.
 
-Create a migration with:
-- An INSERT RLS policy on `events` for authenticated users (needed for client-side inserts)
-- A database trigger function that fires AFTER INSERT on `bets`, `markets`, `verdicts`, and `roasts` — automatically inserting corresponding `events` rows with the right `event_type` and `payload`
+### Hook Changes
 
-Trigger mappings:
-| Source table | event_type | payload |
-|---|---|---|
-| `bets` | `bet_placed` | `{ side, amount, question (from markets), market_id }` |
-| `markets` | `market_created` | `{ question, market_id, deadline }` |
-| `verdicts` (status=committed) | `verdict_in` | `{ market_id, verdict, question }` |
-| `roasts` | `roast_sent` | `{ to_user_id, message }` |
+**Update `src/hooks/useGroupFeed.ts`:**
+- Add a second query fetching all `reactions` where `target_type = 'event'` and `target_id` is in the fetched event IDs
+- Add realtime subscription on `reactions` table too (for live counts)
+- Fetch `users` for the group (name, avatar_color) to resolve user_ids in events
+- Return `{ events, reactions, users, loading }`
 
-Each trigger looks up `group_id` from the relevant row (directly or via `markets`).
+### New Component: `src/components/FeedCard.tsx`
 
-**2. Backfill existing actions into `events`**
+Renders a single feed event based on `event_type`. Each type gets a distinct layout:
 
-Run INSERT statements to populate events from existing `bets`, `markets`, `verdicts`, and `roasts` rows so the feed isn't empty on first load.
+| event_type | Layout |
+|---|---|
+| `bet_placed` | Avatar + "[Name] placed a bet" + YES/NO pill with amount + market question |
+| `coins_sent` | Avatar + "[Name] sent coins to [Name]" + transfer row (from→to avatars, amount, italic message) |
+| `roast_sent` | Avatar + "[From] roasted [To]" + dark bubble with italic roast text + "replied ↗" link |
+| `market_created` | "NEW MARKET" label in yes color + embedded market card with YES/NO buttons |
+| `streak_milestone` | Avatar + "[Name] hit a win streak" + gold streak card (5× Win streak / highest in group) |
+| `market_settled` | Green checkmark avatar + "Market settled" in yes color + verdict + payout rows per user |
+| `coins_reset` | Full-width subtle row with coin icon + "New week · everyone starts with 500 c" in muted text |
 
-**3. Remove Alerts/Notifications entirely**
+### New Component: `src/components/FeedReactions.tsx`
 
-- **`src/App.tsx`**: Remove the `/notifications` route and `Notifications` import
-- **`src/components/BottomNav.tsx`**: Remove the Alerts tab (Bell icon + unread badge). Keep Home, Profile, Sign out
-- **`src/pages/Notifications.tsx`**: Delete file (or leave orphaned — removing route is sufficient)
-- **`src/hooks/useNotifications.ts`**: Remove import from BottomNav
+Replaces the hardcoded `ReactionPills.tsx` with a live version:
+- Props: `eventId`, `groupId`, `reactions` (filtered for this event), `userId`
+- Aggregates reactions by emoji, shows count + toggleable pill
+- "+ react" button opens a small picker popover with 😂🔥👀💀👎
+- Toggle inserts/deletes `reactions` row via Supabase client
+- Realtime updates handled by parent hook invalidation
 
-**4. No changes needed to feed rendering**
+### Update `src/pages/Group.tsx` — Feed tab section (lines 490-504)
 
-`useGroupFeed.ts`, `FeedCard.tsx`, `FeedReactions.tsx`, and the feed tab in `Group.tsx` are already correct — they just need data in the `events` table.
+Replace the raw JSON dump with:
+- Date separators (TODAY, YESTERDAY, older dates)
+- `FeedCard` for each event with `FeedReactions` below
+- Compose bar pinned at bottom: text input placeholder "New market or roast." + "+ Market" button that opens CreateMarketSheet
 
 ### Files
-- **New migration**: Trigger functions + backfill + RLS policy on `events`
-- **`src/App.tsx`**: Remove notifications route
-- **`src/components/BottomNav.tsx`**: Remove Alerts tab
+
+**Modified:**
+- `src/hooks/useGroupFeed.ts` — add reactions query, users lookup, reactions realtime channel
+- `src/pages/Group.tsx` — replace feed tab with rich rendering + compose bar
+
+**Created:**
+- `src/components/FeedCard.tsx` — event type renderer
+- `src/components/FeedReactions.tsx` — live reaction pills wired to Supabase
+
+No database changes needed — `events` and `reactions` tables already exist with correct schema and RLS.
+

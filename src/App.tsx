@@ -13,6 +13,7 @@ import JudgeVerdict from "@/pages/JudgeVerdict";
 import DisputeRevote from "@/pages/DisputeRevote";
 
 import Profile from "@/pages/Profile";
+import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/group/:groupId/judge/:marketId" element={<JudgeVerdict />} />
               <Route path="/group/:groupId/dispute/:disputeId" element={<DisputeRevote />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/notifications" element={<Notifications />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
