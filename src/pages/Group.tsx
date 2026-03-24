@@ -208,6 +208,36 @@ export default function Group() {
     }
   };
 
+  const handleAdminResolve = async (market: MarketRow, verdict: "yes" | "no") => {
+    if (!uid || !isAdmin) return;
+    setResolving(true);
+    try {
+      const { error: vErr } = await supabase.from("verdicts").insert({
+        judge_id: uid,
+        market_id: market.id,
+        verdict,
+        status: "committed",
+      });
+      if (vErr) throw vErr;
+
+      const { error: rErr } = await supabase.rpc("resolve_market", {
+        _market_id: market.id,
+        _judge_id: uid,
+      });
+      if (rErr) throw rErr;
+
+      queryClient.invalidateQueries({ queryKey: ["group-markets"] });
+      queryClient.invalidateQueries({ queryKey: ["public-markets"] });
+      queryClient.invalidateQueries({ queryKey: ["group-market-verdicts"] });
+      setResolveMarket(null);
+      toast.success(`Resolved → ${verdict.toUpperCase()}`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to resolve");
+    } finally {
+      setResolving(false);
+    }
+  };
+
   const renderMarketCard = (m: MarketRow, isPublic: boolean) => {
     const total = m.yes_pool + m.no_pool;
     const yesPct = total > 0 ? Math.round((m.yes_pool / total) * 100) : 50;
