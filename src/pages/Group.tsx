@@ -10,7 +10,8 @@ import BetSheet from "@/components/BetSheet";
 import CreateMarketSheet from "@/components/CreateMarketSheet";
 import RevealCeremony from "@/components/RevealCeremony";
 import { toast } from "sonner";
-import { Plus, Flag, AlertTriangle } from "lucide-react";
+import { Plus, Flag, AlertTriangle, Gavel } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useGroupMarkets } from "@/hooks/useGroupMarkets";
 import { useUserBalance } from "@/hooks/useUserBalance";
 import { useJudgeAssignment } from "@/hooks/useJudgeAssignment";
@@ -23,6 +24,8 @@ import { useQuery } from "@tanstack/react-query";
 
 type Tab = "markets" | "feed" | "board" | "create";
 type Side = "yes" | "no";
+
+const ADMIN_EMAIL = "struthigiridhar@gmail.com";
 
 interface MarketRow {
   id: string;
@@ -63,8 +66,11 @@ export default function Group() {
   const [sheetSide, setSheetSide] = useState<Side>("yes");
   const [createOpen, setCreateOpen] = useState(false);
   const [revealMarketId, setRevealMarketId] = useState<string | null>(null);
+  const [resolveMarket, setResolveMarket] = useState<MarketRow | null>(null);
+  const [resolving, setResolving] = useState(false);
 
   const uid = user?.id;
+  const isAdmin = user?.email === ADMIN_EMAIL;
 
   // Group info (kept inline — single small query)
   const { data: group } = useQuery({
@@ -202,6 +208,36 @@ export default function Group() {
     }
   };
 
+  const handleAdminResolve = async (market: MarketRow, verdict: "yes" | "no") => {
+    if (!uid || !isAdmin) return;
+    setResolving(true);
+    try {
+      const { error: vErr } = await supabase.from("verdicts").insert({
+        judge_id: uid,
+        market_id: market.id,
+        verdict,
+        status: "committed",
+      });
+      if (vErr) throw vErr;
+
+      const { error: rErr } = await supabase.rpc("resolve_market", {
+        _market_id: market.id,
+        _judge_id: uid,
+      });
+      if (rErr) throw rErr;
+
+      queryClient.invalidateQueries({ queryKey: ["group-markets"] });
+      queryClient.invalidateQueries({ queryKey: ["public-markets"] });
+      queryClient.invalidateQueries({ queryKey: ["group-market-verdicts"] });
+      setResolveMarket(null);
+      toast.success(`Resolved → ${verdict.toUpperCase()}`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to resolve");
+    } finally {
+      setResolving(false);
+    }
+  };
+
   const renderMarketCard = (m: MarketRow, isPublic: boolean) => {
     const total = m.yes_pool + m.no_pool;
     const yesPct = total > 0 ? Math.round((m.yes_pool / total) * 100) : 50;
@@ -311,6 +347,18 @@ export default function Group() {
                 className="w-full h-11 rounded-button text-sm font-semibold bg-bg-2 border border-b-0 text-t-1 active:scale-[0.97] transition-all"
               >
                 View result
+              </button>
+            );
+          }
+          // Admin resolve for public markets
+          if (isPublic && isAdmin) {
+            return (
+              <button
+                onClick={() => setResolveMarket(m)}
+                className="w-full h-11 rounded-button text-sm font-semibold bg-coin-bg border border-coin-border text-coin flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+              >
+                <Gavel className="h-4 w-4" />
+                Resolve
               </button>
             );
           }
@@ -642,6 +690,42 @@ export default function Group() {
           }
         />
       )}
+
+      {/* Admin resolve sheet for public markets */}
+      <Sheet open={!!resolveMarket} onOpenChange={(open) => !open && setResolveMarket(null)}>
+        <SheetContent side="bottom" className="bg-bg-0 border-t border-b-1 rounded-t-[20px] px-6 pb-8">
+          <SheetHeader className="text-left">
+            <SheetTitle className="text-t-0 text-base font-bold">Resolve Market</SheetTitle>
+            <SheetDescription className="text-t-2 text-sm">
+              {resolveMarket?.question}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between text-xs text-t-2">
+              <span>Total pool</span>
+              <span className="font-mono-num font-semibold text-coin">
+                {((resolveMarket?.yes_pool ?? 0) + (resolveMarket?.no_pool ?? 0)).toLocaleString()} c
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                disabled={resolving}
+                onClick={() => resolveMarket && handleAdminResolve(resolveMarket, "yes")}
+                className="h-12 rounded-button text-sm font-bold bg-yes-bg border border-yes-border text-yes active:scale-[0.97] transition-all disabled:opacity-50"
+              >
+                YES wins
+              </button>
+              <button
+                disabled={resolving}
+                onClick={() => resolveMarket && handleAdminResolve(resolveMarket, "no")}
+                className="h-12 rounded-button text-sm font-bold bg-no-bg border border-no-border text-no active:scale-[0.97] transition-all disabled:opacity-50"
+              >
+                NO wins
+              </button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <BottomNav />
     </div>
