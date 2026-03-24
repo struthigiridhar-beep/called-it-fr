@@ -80,8 +80,8 @@ export default function Group() {
   const { markets: groupMarkets, publicMarkets, userBets, verdicts: marketVerdicts, disputes, userFlags, memberCount } = useGroupMarkets(groupId, uid);
   const { balance: userCoins } = useUserBalance(uid, groupId);
   const { pendingMarkets: pendingVerdicts } = useJudgeAssignment(groupId, uid);
-  const { events } = useGroupFeed(groupId);
-  const { leaderboard } = useGroupLeaderboard(groupId);
+  const { events, reactions, users: feedUsers } = useGroupFeed(groupId);
+  const feedUsersMap = new Map(feedUsers.map((u) => [u.id, u]));
 
   // User data for first_bet_at
   const { data: userData } = useQuery({
