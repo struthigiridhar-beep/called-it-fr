@@ -1,64 +1,99 @@
 
 
-## Two Issues: Verdict Leak on Home + Broken Coin Payouts
+## Custom Hooks Refactor
 
-### Issue 1: "Verdict → YES" showing on Home page
-
-The Home page group card shows the most recent activity — which is currently picking up verdicts via the `lastActivity` logic (line 116-117). The verdict text "Verdict → YES" is showing because the latest event in the group was a verdict commitment, not a bet.
-
-**Fix**: Change the activity line to only show bet activity (not verdicts). Verdicts are internal judge actions, not social activity worth surfacing on the home dashboard. Remove the verdict comparison from the `lastActivity` logic entirely.
-
-### Issue 2: Coins are stuck — NO payout logic exists
-
-This is the critical bug. Here's what's happening:
-
-- User started with base coins, placed bets totaling 540 coins (deducted correctly), received 300 in bonuses
-- Current balance: 260 coins — mathematically correct based on transactions
-- **But**: Two markets are resolved ("Will it rain" → YES won, "gym 3x" → YES won). The user bet YES on rain (40 coins) and NO on gym (100 coins). They should have received a payout for the rain win, and lost coins on gym.
-- **There are ZERO `payout` transactions in the database.** The `resolve_market` RPC only updates `markets.status = 'resolved'` — it does NOT distribute coins to winners.
-
-The entire payout pipeline is missing. When a verdict is committed and the market resolves, nobody gets paid.
+### Current State
+- **Group.tsx** (760 lines) contains ~10 inline `useQuery` calls for markets, bets, verdicts, disputes, flags, membership, etc.
+- **JudgeVerdict.tsx** has 6 inline queries (market, group, verdict, bets, membership, judge user)
+- **Profile.tsx** has 3 inline queries (profile stats, transactions, win/loss record)
+- **BottomNav.tsx** has 1 inline query (unread notifications)
+- **Notifications.tsx**, **GroupMarkets.tsx**, **GroupFeed.tsx**, **GroupBoard.tsx** are stubs with no Supabase calls yet
+- **BetSheet.tsx** has zero Supabase calls (pure props) — `useUserBalance` would be consumed by Group.tsx to pass `userCoins` prop
+- **Home.tsx** has 1 large query (groups dashboard) — not listed in the 7 hooks but will remain as-is
 
 ### Plan
 
-#### 1. Add payout logic to `resolve_market` RPC (migration)
+#### 1. Create `src/hooks/useGroupMarkets.ts`
+- Accepts `groupId`, `userId`
+- Combines the 6 queries currently in Group.tsx: group markets, public markets, verdicts, disputes, user flags, user bets, member count
+- Returns `{ markets, publicMarkets, userBets, verdicts, disputes, userFlags, memberCount, loading, refetch }`
+- Group markets query: `.eq("group_id", groupId)` with no inner join (current pattern is fine, just `from("markets").select("*")`)
+- `userBets` as `Record<string, { side, amount }>` (the betsByMarket map logic)
 
-Rewrite the `resolve_market` function to:
-- Get the winning side from the committed verdict
-- Calculate total pool (`yes_pool + no_pool`)
-- For each bettor on the winning side: payout = `(their_bet / winning_pool) * total_pool`
-- Credit winners via `UPDATE group_members SET coins = coins + payout`
-- Insert `payout` transaction rows for winners
-- Award XP to winners (+10 per correct bet), deduct from losers or just skip
-- Keep the `UPDATE markets SET status = 'resolved'`
+#### 2. Create `src/hooks/useGroupFeed.ts`
+- Accepts `groupId`
+- Fetches from `events` table ordered by `created_at desc`
+- Sets up `supabase.channel()` realtime subscription on `events` filtered by `group_id`, cleanup on unmount
+- Returns `{ events, loading }`
 
-```text
-Payout formula:
-  winning_side = verdict (yes/no)
-  total_pool = yes_pool + no_pool
-  winning_pool = sum of bets on winning side
-  per_winner_payout = (their_amount / winning_pool) * total_pool
-```
+#### 3. Create `src/hooks/useUserBalance.ts`
+- Accepts `userId`, `groupId`
+- Fetches `coins` from `group_members` (not `users` table — coins are per-group)
+- Clamps with `Math.max(0, balance)`
+- Returns `{ balance, loading, refetch }`
+- Used in Group.tsx to get `userCoins`
 
-#### 2. Backfill payouts for already-resolved markets
+#### 4. Create `src/hooks/useNotifications.ts`
+- Accepts `userId`
+- Fetches notifications ordered by `created_at desc`
+- Derives `unreadCount` from `read === false`
+- `markAllRead` updates all unread rows
+- Returns `{ notifications, unreadCount, loading, markAllRead }`
+- Used in Notifications.tsx (full list) and BottomNav.tsx (badge count)
 
-Run a one-time migration to process payouts for the 2 resolved markets that never paid out:
-- "Will it rain tomorrow?" (YES won, user bet 40 on YES → should get full pool back since only bettor)
-- "Gym 3x week" (YES won, user bet 100 on NO → lost, no payout)
+#### 5. Create `src/hooks/useGroupLeaderboard.ts`
+- Accepts `groupId`
+- Fetches `group_members` joined with `users` (name, avatar_color), ordered by XP desc
+- Returns `{ leaderboard, loading }`
 
-#### 3. Fix Home page activity line
+#### 6. Create `src/hooks/useJudgeAssignment.ts`
+- Accepts `groupId`, `userId`
+- Fetches pending verdicts for this judge in this group (current `pendingVerdicts` query from Group.tsx)
+- Returns `{ pendingMarkets, loading }`
+- Used in Group.tsx (amber banner) and JudgeVerdict.tsx
 
-In `Home.tsx`, remove the verdict branch from `lastActivity` logic (lines 116-122). Only show recent bets as activity.
+#### 7. Create `src/hooks/useProfile.ts`
+- Accepts `userId`
+- Combines Profile.tsx's 3 queries: user stats (name, avatar_color, coins, xp, streak across groups), transactions (last 50), win/loss record
+- Returns `{ profile, transactions, record, loading }`
 
-#### 4. Build out Profile page with coin history
+#### 8. Update pages to consume hooks
 
-The Profile page is currently a stub (just shows email). Add:
-- Current coin balance (from `group_members`)
-- Transaction history list (bets, payouts, bonuses) from `transactions` table
-- Win/loss record from resolved markets
+**Group.tsx** — Replace inline queries with:
+- `useGroupMarkets(groupId, uid)` for markets, bets, verdicts, disputes, flags
+- `useUserBalance(uid, groupId)` for coin display
+- `useJudgeAssignment(groupId, uid)` for judge banner
+- Remove ~100 lines of query code
 
-### Files modified
-- **Migration**: Rewrite `resolve_market` RPC with payout logic + backfill existing resolved markets
-- **`src/pages/Home.tsx`**: Remove verdict from activity line
-- **`src/pages/Profile.tsx`**: Add coin balance, transaction history, win/loss stats
+**Notifications.tsx** — Use `useNotifications(uid)` to render full notification list with mark-all-read button
+
+**BottomNav.tsx** — Use `useNotifications(uid)` for `unreadCount` badge (replacing inline query)
+
+**GroupBoard.tsx** — Use `useGroupLeaderboard(groupId)` to render leaderboard table (currently stub)
+
+**GroupFeed.tsx** — Use `useGroupFeed(groupId)` to render events (currently stub)
+
+**JudgeVerdict.tsx** — Use `useJudgeAssignment(groupId, uid)` for pending check; keep market/verdict-specific queries inline (they're page-specific, not reusable)
+
+**Profile.tsx** — Use `useProfile(uid)` replacing inline queries
+
+**BetSheet.tsx** — No change (pure props component). Balance comes from Group.tsx via `useUserBalance`.
+
+### Files created (7)
+- `src/hooks/useGroupMarkets.ts`
+- `src/hooks/useGroupFeed.ts`
+- `src/hooks/useUserBalance.ts`
+- `src/hooks/useNotifications.ts`
+- `src/hooks/useGroupLeaderboard.ts`
+- `src/hooks/useJudgeAssignment.ts`
+- `src/hooks/useProfile.ts`
+
+### Files modified (7)
+- `src/pages/Group.tsx` — major refactor, ~100 lines removed
+- `src/pages/Notifications.tsx` — fleshed out with hook
+- `src/pages/Profile.tsx` — use useProfile hook
+- `src/pages/GroupBoard.tsx` — fleshed out with leaderboard hook
+- `src/pages/GroupFeed.tsx` — fleshed out with feed hook
+- `src/pages/JudgeVerdict.tsx` — extract judge assignment check
+- `src/components/BottomNav.tsx` — use useNotifications hook
 
