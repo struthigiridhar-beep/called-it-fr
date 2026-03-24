@@ -1,99 +1,65 @@
 
 
-## Custom Hooks Refactor
+## Group Feed — Rich Event Rendering + Live Reactions
 
 ### Current State
-- **Group.tsx** (760 lines) contains ~10 inline `useQuery` calls for markets, bets, verdicts, disputes, flags, membership, etc.
-- **JudgeVerdict.tsx** has 6 inline queries (market, group, verdict, bets, membership, judge user)
-- **Profile.tsx** has 3 inline queries (profile stats, transactions, win/loss record)
-- **BottomNav.tsx** has 1 inline query (unread notifications)
-- **Notifications.tsx**, **GroupMarkets.tsx**, **GroupFeed.tsx**, **GroupBoard.tsx** are stubs with no Supabase calls yet
-- **BetSheet.tsx** has zero Supabase calls (pure props) — `useUserBalance` would be consumed by Group.tsx to pass `userCoins` prop
-- **Home.tsx** has 1 large query (groups dashboard) — not listed in the 7 hooks but will remain as-is
+- `useGroupFeed` fetches from `events` table with realtime subscription — good foundation
+- `events` table has `event_type`, `payload` (jsonb), `user_id`, `group_id`, `created_at`
+- `reactions` table exists with `target_id`, `target_type`, `emoji`, `user_id` — already has RLS for insert/select/delete
+- Feed tab in Group.tsx currently renders raw JSON payload — needs full redesign
+- `ReactionPills.tsx` exists but uses hardcoded data — needs to be wired to Supabase
 
-### Plan
+### Approach
 
-#### 1. Create `src/hooks/useGroupMarkets.ts`
-- Accepts `groupId`, `userId`
-- Combines the 6 queries currently in Group.tsx: group markets, public markets, verdicts, disputes, user flags, user bets, member count
-- Returns `{ markets, publicMarkets, userBets, verdicts, disputes, userFlags, memberCount, loading, refetch }`
-- Group markets query: `.eq("group_id", groupId)` with no inner join (current pattern is fine, just `from("markets").select("*")`)
-- `userBets` as `Record<string, { side, amount }>` (the betsByMarket map logic)
+The feed doesn't need to query multiple tables. The `events` table already stores denormalized data in `payload`. We render each `event_type` with a distinct card layout. Reactions are fetched per-group-feed and matched by `target_id = event.id`.
 
-#### 2. Create `src/hooks/useGroupFeed.ts`
-- Accepts `groupId`
-- Fetches from `events` table ordered by `created_at desc`
-- Sets up `supabase.channel()` realtime subscription on `events` filtered by `group_id`, cleanup on unmount
-- Returns `{ events, loading }`
+### Hook Changes
 
-#### 3. Create `src/hooks/useUserBalance.ts`
-- Accepts `userId`, `groupId`
-- Fetches `coins` from `group_members` (not `users` table — coins are per-group)
-- Clamps with `Math.max(0, balance)`
-- Returns `{ balance, loading, refetch }`
-- Used in Group.tsx to get `userCoins`
+**Update `src/hooks/useGroupFeed.ts`:**
+- Add a second query fetching all `reactions` where `target_type = 'event'` and `target_id` is in the fetched event IDs
+- Add realtime subscription on `reactions` table too (for live counts)
+- Fetch `users` for the group (name, avatar_color) to resolve user_ids in events
+- Return `{ events, reactions, users, loading }`
 
-#### 4. Create `src/hooks/useNotifications.ts`
-- Accepts `userId`
-- Fetches notifications ordered by `created_at desc`
-- Derives `unreadCount` from `read === false`
-- `markAllRead` updates all unread rows
-- Returns `{ notifications, unreadCount, loading, markAllRead }`
-- Used in Notifications.tsx (full list) and BottomNav.tsx (badge count)
+### New Component: `src/components/FeedCard.tsx`
 
-#### 5. Create `src/hooks/useGroupLeaderboard.ts`
-- Accepts `groupId`
-- Fetches `group_members` joined with `users` (name, avatar_color), ordered by XP desc
-- Returns `{ leaderboard, loading }`
+Renders a single feed event based on `event_type`. Each type gets a distinct layout:
 
-#### 6. Create `src/hooks/useJudgeAssignment.ts`
-- Accepts `groupId`, `userId`
-- Fetches pending verdicts for this judge in this group (current `pendingVerdicts` query from Group.tsx)
-- Returns `{ pendingMarkets, loading }`
-- Used in Group.tsx (amber banner) and JudgeVerdict.tsx
+| event_type | Layout |
+|---|---|
+| `bet_placed` | Avatar + "[Name] placed a bet" + YES/NO pill with amount + market question |
+| `coins_sent` | Avatar + "[Name] sent coins to [Name]" + transfer row (from→to avatars, amount, italic message) |
+| `roast_sent` | Avatar + "[From] roasted [To]" + dark bubble with italic roast text + "replied ↗" link |
+| `market_created` | "NEW MARKET" label in yes color + embedded market card with YES/NO buttons |
+| `streak_milestone` | Avatar + "[Name] hit a win streak" + gold streak card (5× Win streak / highest in group) |
+| `market_settled` | Green checkmark avatar + "Market settled" in yes color + verdict + payout rows per user |
+| `coins_reset` | Full-width subtle row with coin icon + "New week · everyone starts with 500 c" in muted text |
 
-#### 7. Create `src/hooks/useProfile.ts`
-- Accepts `userId`
-- Combines Profile.tsx's 3 queries: user stats (name, avatar_color, coins, xp, streak across groups), transactions (last 50), win/loss record
-- Returns `{ profile, transactions, record, loading }`
+### New Component: `src/components/FeedReactions.tsx`
 
-#### 8. Update pages to consume hooks
+Replaces the hardcoded `ReactionPills.tsx` with a live version:
+- Props: `eventId`, `groupId`, `reactions` (filtered for this event), `userId`
+- Aggregates reactions by emoji, shows count + toggleable pill
+- "+ react" button opens a small picker popover with 😂🔥👀💀👎
+- Toggle inserts/deletes `reactions` row via Supabase client
+- Realtime updates handled by parent hook invalidation
 
-**Group.tsx** — Replace inline queries with:
-- `useGroupMarkets(groupId, uid)` for markets, bets, verdicts, disputes, flags
-- `useUserBalance(uid, groupId)` for coin display
-- `useJudgeAssignment(groupId, uid)` for judge banner
-- Remove ~100 lines of query code
+### Update `src/pages/Group.tsx` — Feed tab section (lines 490-504)
 
-**Notifications.tsx** — Use `useNotifications(uid)` to render full notification list with mark-all-read button
+Replace the raw JSON dump with:
+- Date separators (TODAY, YESTERDAY, older dates)
+- `FeedCard` for each event with `FeedReactions` below
+- Compose bar pinned at bottom: text input placeholder "New market or roast." + "+ Market" button that opens CreateMarketSheet
 
-**BottomNav.tsx** — Use `useNotifications(uid)` for `unreadCount` badge (replacing inline query)
+### Files
 
-**GroupBoard.tsx** — Use `useGroupLeaderboard(groupId)` to render leaderboard table (currently stub)
+**Modified:**
+- `src/hooks/useGroupFeed.ts` — add reactions query, users lookup, reactions realtime channel
+- `src/pages/Group.tsx` — replace feed tab with rich rendering + compose bar
 
-**GroupFeed.tsx** — Use `useGroupFeed(groupId)` to render events (currently stub)
+**Created:**
+- `src/components/FeedCard.tsx` — event type renderer
+- `src/components/FeedReactions.tsx` — live reaction pills wired to Supabase
 
-**JudgeVerdict.tsx** — Use `useJudgeAssignment(groupId, uid)` for pending check; keep market/verdict-specific queries inline (they're page-specific, not reusable)
-
-**Profile.tsx** — Use `useProfile(uid)` replacing inline queries
-
-**BetSheet.tsx** — No change (pure props component). Balance comes from Group.tsx via `useUserBalance`.
-
-### Files created (7)
-- `src/hooks/useGroupMarkets.ts`
-- `src/hooks/useGroupFeed.ts`
-- `src/hooks/useUserBalance.ts`
-- `src/hooks/useNotifications.ts`
-- `src/hooks/useGroupLeaderboard.ts`
-- `src/hooks/useJudgeAssignment.ts`
-- `src/hooks/useProfile.ts`
-
-### Files modified (7)
-- `src/pages/Group.tsx` — major refactor, ~100 lines removed
-- `src/pages/Notifications.tsx` — fleshed out with hook
-- `src/pages/Profile.tsx` — use useProfile hook
-- `src/pages/GroupBoard.tsx` — fleshed out with leaderboard hook
-- `src/pages/GroupFeed.tsx` — fleshed out with feed hook
-- `src/pages/JudgeVerdict.tsx` — extract judge assignment check
-- `src/components/BottomNav.tsx` — use useNotifications hook
+No database changes needed — `events` and `reactions` tables already exist with correct schema and RLS.
 
