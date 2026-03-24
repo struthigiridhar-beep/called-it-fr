@@ -51,7 +51,7 @@ export default function Home() {
       const groupIds = memberships.map((m) => m.group_id);
 
       // Parallel fetches
-      const [groupsRes, allMembersRes, marketsRes, betsRes, verdictsRes] = await Promise.all([
+      const [groupsRes, allMembersRes, marketsRes, betsRes] = await Promise.all([
         supabase.from("groups").select("id, name").in("id", groupIds),
         supabase.from("group_members").select("group_id, user_id, xp").in("group_id", groupIds),
         supabase.from("markets").select("id, group_id, status").in("group_id", groupIds),
@@ -59,18 +59,12 @@ export default function Home() {
           .from("bets")
           .select("id, market_id, created_at, user_id, side, amount")
           .order("created_at", { ascending: false }),
-        supabase
-          .from("verdicts")
-          .select("market_id, verdict, status, committed_at")
-          .eq("status", "committed")
-          .order("committed_at", { ascending: false }),
       ]);
 
       const groupsMap = new Map((groupsRes.data ?? []).map((g) => [g.id, g]));
       const allMembers = allMembersRes.data ?? [];
       const markets = marketsRes.data ?? [];
       const bets = betsRes.data ?? [];
-      const verdicts = verdictsRes.data ?? [];
 
       // Get user names for activity
       const userIds = [...new Set(allMembers.map((m) => m.user_id))];
