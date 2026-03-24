@@ -20,8 +20,9 @@ Deno.serve(async (req) => {
     // 1. Find open markets past deadline
     const { data: expiredMarkets, error: mErr } = await supabase
       .from("markets")
-      .select("id, group_id, question, created_by")
+      .select("id, group_id, question, created_by, is_public")
       .eq("status", "open")
+      .eq("is_public", false)
       .lt("deadline", new Date().toISOString());
 
     if (mErr) throw mErr;
