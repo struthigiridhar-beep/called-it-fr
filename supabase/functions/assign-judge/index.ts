@@ -26,9 +26,24 @@ Deno.serve(async (req) => {
       .lt("deadline", new Date().toISOString());
 
     if (mErr) throw mErr;
+
+    // Also close expired public markets (no judge assignment needed)
+    const { data: expiredPublic } = await supabase
+      .from("markets")
+      .select("id")
+      .eq("status", "open")
+      .eq("is_public", true)
+      .lt("deadline", new Date().toISOString());
+
+    if (expiredPublic?.length) {
+      for (const pm of expiredPublic) {
+        await supabase.from("markets").update({ status: "closed" }).eq("id", pm.id);
+      }
+    }
+
     if (!expiredMarkets?.length) {
       return new Response(
-        JSON.stringify({ message: "No expired markets", count: 0 }),
+        JSON.stringify({ message: "No expired private markets", count: 0, publicClosed: expiredPublic?.length ?? 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
