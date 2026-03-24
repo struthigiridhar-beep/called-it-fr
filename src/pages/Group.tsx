@@ -25,6 +25,8 @@ import { useQuery } from "@tanstack/react-query";
 type Tab = "markets" | "feed" | "board" | "create";
 type Side = "yes" | "no";
 
+const ADMIN_EMAIL = "struthigiridhar@gmail.com";
+
 interface MarketRow {
   id: string;
   question: string;
