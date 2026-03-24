@@ -20,30 +20,14 @@ Deno.serve(async (req) => {
     // 1. Find open markets past deadline
     const { data: expiredMarkets, error: mErr } = await supabase
       .from("markets")
-      .select("id, group_id, question, created_by, is_public")
+      .select("id, group_id, question, created_by")
       .eq("status", "open")
-      .eq("is_public", false)
       .lt("deadline", new Date().toISOString());
 
     if (mErr) throw mErr;
-
-    // Also close expired public markets (no judge assignment needed)
-    const { data: expiredPublic } = await supabase
-      .from("markets")
-      .select("id")
-      .eq("status", "open")
-      .eq("is_public", true)
-      .lt("deadline", new Date().toISOString());
-
-    if (expiredPublic?.length) {
-      for (const pm of expiredPublic) {
-        await supabase.from("markets").update({ status: "closed" }).eq("id", pm.id);
-      }
-    }
-
     if (!expiredMarkets?.length) {
       return new Response(
-        JSON.stringify({ message: "No expired private markets", count: 0, publicClosed: expiredPublic?.length ?? 0 }),
+        JSON.stringify({ message: "No expired markets", count: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
