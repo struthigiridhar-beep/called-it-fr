@@ -1,82 +1,64 @@
 
 
-## Dispute & Re-vote System
+## Two Issues: Verdict Leak on Home + Broken Coin Payouts
 
-### Overview
-After a verdict is committed, group members can flag it within 12 hours. When flags exceed half the group size, a community re-vote is triggered. Members vote YES/NO, and when a majority is reached, the dispute resolves -- either upholding or overturning the original verdict, with coin redistribution and integrity score changes.
+### Issue 1: "Verdict → YES" showing on Home page
 
-### Database Changes (1 migration)
+The Home page group card shows the most recent activity — which is currently picking up verdicts via the `lastActivity` logic (line 116-117). The verdict text "Verdict → YES" is showing because the latest event in the group was a verdict commitment, not a bet.
 
-**New tables:**
+**Fix**: Change the activity line to only show bet activity (not verdicts). Verdicts are internal judge actions, not social activity worth surfacing on the home dashboard. Remove the verdict comparison from the `lastActivity` logic entirely.
 
-1. `dispute_flags` — tracks individual flags (prevents double-flagging)
-   - `id UUID PK`
-   - `dispute_id UUID FK -> disputes`
-   - `user_id UUID FK -> users`  
-   - `created_at TIMESTAMPTZ DEFAULT now()`
-   - `UNIQUE(dispute_id, user_id)`
-   - RLS: group members can view; authenticated users can insert (if in group)
+### Issue 2: Coins are stuck — NO payout logic exists
 
-2. `dispute_votes` — tracks re-vote ballots
-   - `id UUID PK`
-   - `dispute_id UUID FK -> disputes`
-   - `user_id UUID FK -> users`
-   - `vote verdict_outcome (yes/no)`
-   - `created_at TIMESTAMPTZ DEFAULT now()`
-   - `UNIQUE(dispute_id, user_id)`
-   - RLS: group members can view; authenticated users can insert (if in group)
+This is the critical bug. Here's what's happening:
 
-**Alter `disputes` table:**
-- Add `resolved_at TIMESTAMPTZ NULL`
-- Add `resolution_verdict verdict_outcome NULL` (the final re-vote result)
+- User started with base coins, placed bets totaling 540 coins (deducted correctly), received 300 in bonuses
+- Current balance: 260 coins — mathematically correct based on transactions
+- **But**: Two markets are resolved ("Will it rain" → YES won, "gym 3x" → YES won). The user bet YES on rain (40 coins) and NO on gym (100 coins). They should have received a payout for the rain win, and lost coins on gym.
+- **There are ZERO `payout` transactions in the database.** The `resolve_market` RPC only updates `markets.status = 'resolved'` — it does NOT distribute coins to winners.
 
-**New RPCs (SECURITY DEFINER):**
+The entire payout pipeline is missing. When a verdict is committed and the market resolves, nobody gets paid.
 
-1. `flag_verdict(_verdict_id, _user_id)`:
-   - Validates user is in the group, hasn't already flagged, verdict is committed, within 12h window
-   - Upserts dispute row (creates if first flag, increments `flags` count)
-   - Inserts `dispute_flags` row
-   - Checks if `flags > (group member count / 2)` → if so, sets `disputes.status = 'open'`, sets `markets.status = 'disputed'`, inserts notification to all group members
+### Plan
 
-2. `cast_dispute_vote(_dispute_id, _user_id, _vote)`:
-   - Validates user is in group, dispute is open, user hasn't voted
-   - Inserts `dispute_votes` row
-   - Counts votes; when > 50% of group members have voted with a majority:
-     - If majority matches original verdict: set dispute status = `upheld`, judge integrity +5% (capped at 1.0), distribute coins as original
-     - If majority differs: set dispute status = `overturned`, update verdict status to `overturned`, judge integrity -15%, reverse and redistribute coins
-     - Set market status back to `resolved`
-     - Insert resolution notification to all group members
+#### 1. Add payout logic to `resolve_market` RPC (migration)
 
-**Enable Supabase Realtime** on `dispute_votes` and `dispute_flags` for live tally updates.
+Rewrite the `resolve_market` function to:
+- Get the winning side from the committed verdict
+- Calculate total pool (`yes_pool + no_pool`)
+- For each bettor on the winning side: payout = `(their_bet / winning_pool) * total_pool`
+- Credit winners via `UPDATE group_members SET coins = coins + payout`
+- Insert `payout` transaction rows for winners
+- Award XP to winners (+10 per correct bet), deduct from losers or just skip
+- Keep the `UPDATE markets SET status = 'resolved'`
 
-### New Pages & Components
+```text
+Payout formula:
+  winning_side = verdict (yes/no)
+  total_pool = yes_pool + no_pool
+  winning_pool = sum of bets on winning side
+  per_winner_payout = (their_amount / winning_pool) * total_pool
+```
 
-1. **`src/pages/DisputeRevote.tsx`** — `/group/:groupId/dispute/:disputeId`
-   - Route added to App.tsx
-   - Shows: disputed verdict card (judge name, original YES/NO, integrity score), "What actually happened?" YES/NO buttons, live tally of group member votes (with avatars, names, and vote status), coins locked indicator
-   - Uses Supabase realtime subscription on `dispute_votes` for live updates
-   - Calls `cast_dispute_vote` RPC on vote
+#### 2. Backfill payouts for already-resolved markets
 
-2. **Update `src/pages/Group.tsx` — settled market cards:**
-   - For resolved markets with committed verdict within 12h: show "Flag this verdict" button
-   - Query `dispute_flags` to show current flag count and whether user already flagged
-   - For markets with status `disputed`: show "Disputed" badge and link to re-vote screen
-   - Call `flag_verdict` RPC on flag button click
+Run a one-time migration to process payouts for the 2 resolved markets that never paid out:
+- "Will it rain tomorrow?" (YES won, user bet 40 on YES → should get full pool back since only bettor)
+- "Gym 3x week" (YES won, user bet 100 on NO → lost, no payout)
 
-3. **Update `src/components/RevealCeremony.tsx`:**
-   - In State 3 (verdict view), add flag section at bottom: judge info card, flag progress bar, "Flag this verdict" button
-   - Show "You've flagged this verdict" if user already flagged
-   - Show dispute status if threshold reached
+#### 3. Fix Home page activity line
 
-### Files to create/modify
-- **New migration**: `dispute_flags` table, `dispute_votes` table, alter `disputes`, two RPCs, realtime enablement
-- **New file**: `src/pages/DisputeRevote.tsx`
-- **Modified**: `src/App.tsx` (add route)
-- **Modified**: `src/pages/Group.tsx` (flag button on settled cards, disputed badge, link to re-vote)
-- **Modified**: `src/components/RevealCeremony.tsx` (flag section in verdict view)
+In `Home.tsx`, remove the verdict branch from `lastActivity` logic (lines 116-122). Only show recent bets as activity.
 
-### UI Design (matching uploaded mockups)
-- Settled market card: verdict badge (YES WON / NO WON or Disputed), judge info with integrity score, flag progress bar (`X / Y flags`), "Flag this verdict" / "You've flagged" button
-- Re-vote screen: header "Community re-vote triggered", original verdict card with judge name + integrity, YES/NO vote buttons, live member vote tally list (avatar + name + vote/waiting), coins locked banner, "Cast your vote" CTA
-- Color scheme: dispute/flag elements use the existing `coin` (amber/orange) color tokens for warnings, `no` (red) for disputed state
+#### 4. Build out Profile page with coin history
+
+The Profile page is currently a stub (just shows email). Add:
+- Current coin balance (from `group_members`)
+- Transaction history list (bets, payouts, bonuses) from `transactions` table
+- Win/loss record from resolved markets
+
+### Files modified
+- **Migration**: Rewrite `resolve_market` RPC with payout logic + backfill existing resolved markets
+- **`src/pages/Home.tsx`**: Remove verdict from activity line
+- **`src/pages/Profile.tsx`**: Add coin balance, transaction history, win/loss stats
 
