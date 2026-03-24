@@ -350,6 +350,18 @@ export default function Group() {
               </button>
             );
           }
+          // Admin resolve for public markets
+          if (isPublic && isAdmin) {
+            return (
+              <button
+                onClick={() => setResolveMarket(m)}
+                className="w-full h-11 rounded-button text-sm font-semibold bg-coin-bg border border-coin-border text-coin flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+              >
+                <Gavel className="h-4 w-4" />
+                Resolve
+              </button>
+            );
+          }
           const isJudgeForMarket = pendingVerdicts.some((v) => v.id === m.id);
           if (isJudgeForMarket) {
             return (
