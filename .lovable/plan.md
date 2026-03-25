@@ -1,68 +1,44 @@
 
 
-## Roast Composer Flow
+## Fix Feed Realtime, Add Roast Triggers to Feed, Add Sign-In Button
 
-### Overview
-Build a multi-step roast flow: composer screen → sent confirmation screen. Accessible from feed event actions and profile. The `roasts` table already exists with `from_user`, `to_user`, `group_id`, `message`, `trigger_type`.
+### Three Issues
 
-### New Files
+1. **Feed not updating in realtime**: The `events` and `reactions` tables are missing from the Supabase realtime publication. The hooks subscribe to postgres_changes but never receive them. Only `dispute_flags` and `dispute_votes` are currently published.
 
-#### 1. `src/pages/RoastComposer.tsx`
-Full-screen page at route `/group/:groupId/roast/:toUserId`.
+2. **No roast action on feed events**: The `market_settled` FeedCard shows verdict info but has zero action buttons for roasting losers. Similarly, `bet_placed` events don't offer roast options after a market resolves. Users can't trigger the roast flow from the feed.
 
-Query params pass context: `?trigger=bet_loss&reason=Lost 200 c · bet NO on launch slip&name=Rahul K&color=#...`
+3. **No sign-in button on landing page**: Returning users have no way to sign in without going through the bet flow.
 
-**Layout (matching screenshots exactly):**
-- Header: `← Back` button + "Roast [Name]"
-- Target card: avatar (colored circle with initials), name, reason line in muted text
-- Section label: "BET LOSS ROASTS" or "STREAK BREAK ROASTS" based on trigger
-- 4 preset roast cards — bordered cards with radio dot indicator, tapping selects (highlighted border turns roast-colored)
-- "✏️ Use a preset instead" / "✏️ Write your own" toggle button — swaps between preset list and textarea (max 140 chars)
-- **LIVE PREVIEW** section: dark red-bordered bubble showing "To: [Name]" + "@you" + the selected roast text in italic roast color
-- "Send roast 🔥" button at bottom
+---
 
-**Preset lines:**
-- `bet_loss`: 4 lines about being wrong / bad odds reading (from screenshot)
-- `streak_break`: 4 lines about streak dying
+### Changes
 
-**On send:**
-1. Insert into `roasts` table (`from_user`, `to_user`, `group_id`, `message`, `trigger_type`)
-2. Insert into `notifications` table (`user_id = to_user`, `type = "roast_received"`, `payload = { from_name, message, group_id, roast_id, from_user_id }`)
-3. Insert into `events` table (`event_type = "roast_sent"`, `payload = { to_user_id, message, has_reply: false }`)
-4. Navigate to sent confirmation (same page, state toggle)
+#### 1. Migration: Add tables to realtime publication
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE events;
+ALTER PUBLICATION supabase_realtime ADD TABLE reactions;
+```
+This will make the existing realtime subscriptions in `useGroupFeed.ts` actually work.
 
-#### 2. Sent Confirmation (same component, state-driven)
-- Checkmark circle icon
-- "Roast sent." heading
-- "[Name] can see it now. The group can too." in muted text
-- Red-bordered preview bubble with the roast text
-- "🔥 Roast again" button → resets composer state
-- "← Back to feed" button → navigates to group feed tab
+#### 2. `src/components/FeedCard.tsx` — Add roast action buttons
 
-### Modified Files
+- **`market_settled` events**: Below the verdict/payouts, add a row of action buttons. For each user who lost (bet on the wrong side), show "🔥 Roast [Name]" linking to the roast composer with `trigger=bet_loss` and reason like "Lost on [question]". This requires passing market bets data or computing losers from the payload.
+  - Simpler approach: Add a generic "🔥 Roast a loser" button that navigates to a member picker, OR add roast buttons for known losing users from the payouts/bets context.
+  - Best approach: The `market_settled` payload already has `verdict`. Any `bet_placed` event for the same market on the opposite side = a loser. Add a prop `allEvents` or compute from `users` map. **Simplest**: just add a "🔥 Roast" button on `market_settled` that lets the user pick a target from group members.
 
-#### 3. `src/App.tsx`
-Add route: `/group/:groupId/roast/:toUserId` → `<RoastComposer />`
+- **`bet_placed` events**: Add a subtle "🔥 Roast" action button visible to other users (not the actor) — allows roasting someone for a bold/bad bet.
 
-#### 4. `src/components/FeedCard.tsx`
-- On `bet_placed` events where market is settled and user lost: add "🔥 Roast" and "Send coins" action buttons
-- On `roast_sent` events: add "🔥 Fire back" button for the recipient (navigates to roast composer targeting the sender)
-- On `streak_milestone` / streak break events: add "🔥 Roast streak" button
+#### 3. `src/pages/Landing.tsx` — Add subtle sign-in link
 
-#### 5. `src/pages/Notifications.tsx`
-- For `roast_received` type notifications: render rich card with fire icon, "[Name] roasted you", roast preview text, timestamp
-- Action buttons: "🔥 Fire back" (opens composer targeting sender), "React", "Ignore"
+Below the "Create your own bet" button (line 449), add:
+```
+Already have an account? Sign in
+```
+Styled as `text-t-2 text-xs text-center` with "Sign in" underlined. Clicking sets `authMode` to `"signin"` and advances to the auth step.
 
-#### 6. `src/pages/Profile.tsx`
-- Add "🔥 Roast" button in the action area (only shown when viewing another user's profile, or as a general entry point)
-
-### Design Tokens
-- All dark backgrounds (`bg-bg-0`, `bg-bg-1`, `bg-bg-2`)
-- Roast preview bubble: dark red background with roast-colored border and italic text (matching the warm/copper tones in screenshots — use `border-[#8B4513]/40 bg-[#3D1F0E]` style)
-- Selected preset: filled radio dot + highlighted border in roast color
-- Monospace for all numbers (`font-mono-num`)
-- Buttons use existing `rounded-button`, `border border-b-1` patterns
-
-### No Database Changes
-The `roasts`, `notifications`, and `events` tables already exist with the needed schema.
+### Files Modified
+- **Migration**: Add `events` and `reactions` to realtime publication
+- `src/components/FeedCard.tsx` — roast action buttons on `market_settled` and `bet_placed`
+- `src/pages/Landing.tsx` — sign-in link at bottom
 
