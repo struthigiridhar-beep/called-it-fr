@@ -88,6 +88,11 @@ export default {
           bg: "hsl(var(--success-bg))",
           border: "hsl(var(--success-border))",
         },
+        roast: {
+          DEFAULT: "hsl(var(--roast))",
+          bg: "hsl(var(--roast-bg))",
+          border: "hsl(var(--roast-border))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

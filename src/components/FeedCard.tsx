@@ -1,5 +1,7 @@
 import type { FeedEvent, FeedUser } from "@/hooks/useGroupFeed";
-import { Coins, CheckCircle } from "lucide-react";
+import { Coins, CheckCircle, Flame } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 interface FeedCardProps {
   event: FeedEvent;
@@ -29,6 +31,19 @@ export default function FeedCard({ event, users, onYes, onNo }: FeedCardProps) {
   const p = payload as any;
   const actor = users.get(user_id);
   const actorName = actor?.name ?? "Someone";
+  const navigate = useNavigate();
+  const { groupId } = useParams<{ groupId: string }>();
+  const { user: currentUser } = useAuth();
+
+  const roastLink = (targetId: string, targetUser: FeedUser | undefined, triggerType: string, reason: string) => {
+    const params = new URLSearchParams({
+      trigger: triggerType,
+      reason,
+      name: targetUser?.name || "Someone",
+      color: targetUser?.avatar_color || "#7B9EC8",
+    });
+    navigate(`/group/${groupId}/roast/${targetId}?${params.toString()}`);
+  };
 
   switch (event_type) {
     case "bet_placed": {
