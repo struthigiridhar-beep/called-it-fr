@@ -1,3 +1,4 @@
+import React from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import BottomNav from "@/components/BottomNav";
@@ -5,7 +6,7 @@ import { ArrowLeft, Bell, CheckCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 
-export default function Notifications() {
+const Notifications = React.forwardRef<HTMLDivElement>((_, ref) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { notifications, unreadCount, markAllRead } = useNotifications(user?.id);
@@ -21,7 +22,7 @@ export default function Notifications() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-bg-0 flex flex-col">
+    <div ref={ref} className="min-h-[100dvh] bg-bg-0 flex flex-col">
       <div className="flex-1 overflow-y-auto px-4 pt-safe-top pb-28">
         <header className="pt-4 pb-2 flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="text-t-2">
@@ -68,4 +69,8 @@ export default function Notifications() {
       <BottomNav />
     </div>
   );
-}
+});
+
+Notifications.displayName = "Notifications";
+
+export default Notifications;
