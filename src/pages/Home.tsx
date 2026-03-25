@@ -6,6 +6,8 @@ import { Plus } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import CreateMarketSheet from "@/components/CreateMarketSheet";
 import { useState } from "react";
+import { usePublicBets } from "@/hooks/usePublicBets";
+import OddsBar from "@/components/OddsBar";
 
 interface GroupCardData {
   id: string;
