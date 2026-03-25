@@ -589,24 +589,6 @@ export default function Group() {
                 })()
               )}
 
-              {/* Compose bar */}
-              <div className="sticky bottom-20 pt-3">
-                <div className="flex items-center gap-2 rounded-card bg-bg-1 border border-b-1 p-2">
-                  <input
-                    type="text"
-                    placeholder="New market or roast…"
-                    className="flex-1 bg-transparent text-sm text-t-0 placeholder:text-t-2 outline-none px-2"
-                    readOnly
-                    onClick={() => setCreateOpen(true)}
-                  />
-                  <button
-                    onClick={() => setCreateOpen(true)}
-                    className="h-8 px-3 rounded-button text-xs font-semibold bg-yes-bg border border-yes-border text-yes active:scale-[0.97] transition-all"
-                  >
-                    + Market
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
