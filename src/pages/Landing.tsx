@@ -447,6 +447,16 @@ export default function Landing() {
           <span className="text-t-1 text-sm">Create your own bet instead</span>
           <span className="text-t-2 text-sm">›</span>
         </button>
+
+        <p className="text-center text-t-2 text-xs pt-2">
+          Already have an account?{" "}
+          <button
+            onClick={() => { setAuthMode("signin"); setStep("auth"); }}
+            className="text-t-1 underline underline-offset-2 hover:text-t-0 transition-colors"
+          >
+            Sign in
+          </button>
+        </p>
       </div>
 
       {/* Bet drawer */}

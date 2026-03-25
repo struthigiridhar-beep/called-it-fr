@@ -45,6 +45,8 @@ export default function FeedCard({ event, users, onYes, onNo }: FeedCardProps) {
     navigate(`/group/${groupId}/roast/${targetId}?${params.toString()}`);
   };
 
+  const isNotSelf = currentUser?.id !== user_id;
+
   switch (event_type) {
     case "bet_placed": {
       const side = p.side as string;
@@ -70,6 +72,14 @@ export default function FeedCard({ event, users, onYes, onNo }: FeedCardProps) {
               <span className="font-mono-num text-xs text-coin font-semibold">{amount} c</span>
             </div>
             {question && <p className="text-xs text-t-2 leading-snug">"{question}"</p>}
+            {isNotSelf && (
+              <button
+                onClick={() => roastLink(user_id, actor, "bet_loss", `Bold bet: ${side.toUpperCase()} on "${question}"`)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-roast mt-1"
+              >
+                <Flame className="h-3 w-3" /> Roast
+              </button>
+            )}
           </div>
         </div>
       );
@@ -218,6 +228,21 @@ export default function FeedCard({ event, users, onYes, onNo }: FeedCardProps) {
                 })}
               </div>
             )}
+            {/* Roast action — pick any group member */}
+            <button
+              onClick={() => {
+                // Find a non-self user to roast (first payout winner or fallback)
+                const targetId = payouts.find(po => po.user_id !== currentUser?.id)?.user_id
+                  ?? Array.from(users.entries()).find(([id]) => id !== currentUser?.id)?.[0];
+                if (targetId) {
+                  const targetUser = users.get(targetId);
+                  roastLink(targetId, targetUser, "bet_loss", `Lost on "${question}"`);
+                }
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-roast mt-1"
+            >
+              <Flame className="h-3 w-3" /> Roast a loser
+            </button>
           </div>
         </div>
       );
