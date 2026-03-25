@@ -129,6 +129,7 @@ export default function Home() {
   });
 
 
+  const { data: publicBets = [] } = usePublicBets(user?.id);
   const totalLive = groups.reduce((sum, g) => sum + g.liveMarkets, 0);
 
   return (
@@ -139,7 +140,7 @@ export default function Home() {
         <header className="pt-4 pb-2">
           <h1 className="text-2xl font-bold text-t-0 tracking-tight">Called It.</h1>
           <p className="text-sm text-t-1 mt-0.5">
-            {groups.length} group{groups.length !== 1 ? "s" : ""} · {totalLive} market{totalLive !== 1 ? "s" : ""} live
+            {groups.length} group{groups.length !== 1 ? "s" : ""} · {publicBets.length > 0 ? `${publicBets.length} public bet${publicBets.length !== 1 ? "s" : ""} · ` : ""}{totalLive} market{totalLive !== 1 ? "s" : ""} live
           </p>
         </header>
 
