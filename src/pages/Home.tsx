@@ -6,6 +6,8 @@ import { Plus } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import CreateMarketSheet from "@/components/CreateMarketSheet";
 import { useState } from "react";
+import { usePublicBets } from "@/hooks/usePublicBets";
+import OddsBar from "@/components/OddsBar";
 
 interface GroupCardData {
   id: string;
@@ -127,6 +129,7 @@ export default function Home() {
   });
 
 
+  const { data: publicBets = [] } = usePublicBets(user?.id);
   const totalLive = groups.reduce((sum, g) => sum + g.liveMarkets, 0);
 
   return (
@@ -137,7 +140,7 @@ export default function Home() {
         <header className="pt-4 pb-2">
           <h1 className="text-2xl font-bold text-t-0 tracking-tight">Called It.</h1>
           <p className="text-sm text-t-1 mt-0.5">
-            {groups.length} group{groups.length !== 1 ? "s" : ""} · {totalLive} market{totalLive !== 1 ? "s" : ""} live
+            {groups.length} group{groups.length !== 1 ? "s" : ""} · {publicBets.length > 0 ? `${publicBets.length} public bet${publicBets.length !== 1 ? "s" : ""} · ` : ""}{totalLive} market{totalLive !== 1 ? "s" : ""} live
           </p>
         </header>
 
@@ -224,6 +227,41 @@ export default function Home() {
                 )}
               </button>
             ))
+          )}
+
+          {/* Public bets section */}
+          {publicBets.length > 0 && (
+            <div className="mt-6">
+              <h2 className="text-sm font-semibold text-t-1 mb-2">Your Public Bets</h2>
+              <div className="space-y-2">
+                {publicBets.map((m) => (
+                  <Link
+                    key={m.id}
+                    to="/"
+                    className="block rounded-card border border-b-0 bg-bg-1 p-3 space-y-2 active:scale-[0.98] transition-transform"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-t-0 flex-1">{m.question}</p>
+                      <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-pill ${
+                        m.status === "open" ? "bg-yes/20 text-yes" :
+                        m.status === "resolved" ? "bg-t-2/20 text-t-2" :
+                        "bg-coin/20 text-coin"
+                      }`}>
+                        {m.status}
+                      </span>
+                    </div>
+                    <OddsBar yesPool={m.yes_pool} noPool={m.no_pool} />
+                    <div className="flex items-center gap-2 text-xs text-t-2">
+                      <span className={`font-semibold ${m.userSide === "yes" ? "text-yes" : "text-no"}`}>
+                        You bet {m.userSide.toUpperCase()}
+                      </span>
+                      <span>·</span>
+                      <span className="font-mono-num">{m.userAmount} coins</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Create / join group CTA */}
