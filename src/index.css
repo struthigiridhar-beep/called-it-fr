@@ -40,6 +40,11 @@
     --success-bg: 112 44% 7%;
     --success-border: 106 40% 21%;
 
+    /* Roast (warm copper/red) */
+    --roast: 16 60% 52%;
+    --roast-bg: 12 40% 8%;
+    --roast-border: 14 45% 18%;
+
     /* Shadcn mappings */
     --background: var(--bg-0);
     --foreground: var(--t-0);

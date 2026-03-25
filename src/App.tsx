@@ -11,6 +11,7 @@ import Home from "@/pages/Home";
 import Group from "@/pages/Group";
 import JudgeVerdict from "@/pages/JudgeVerdict";
 import DisputeRevote from "@/pages/DisputeRevote";
+import RoastComposer from "@/pages/RoastComposer";
 
 import Profile from "@/pages/Profile";
 import Notifications from "@/pages/Notifications";
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/group/:groupId" element={<Group />} />
               <Route path="/group/:groupId/judge/:marketId" element={<JudgeVerdict />} />
               <Route path="/group/:groupId/dispute/:disputeId" element={<DisputeRevote />} />
+              <Route path="/group/:groupId/roast/:toUserId" element={<RoastComposer />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/notifications" element={<Notifications />} />
             </Route>

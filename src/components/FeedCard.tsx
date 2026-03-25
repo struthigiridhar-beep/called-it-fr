@@ -1,5 +1,7 @@
 import type { FeedEvent, FeedUser } from "@/hooks/useGroupFeed";
-import { Coins, CheckCircle } from "lucide-react";
+import { Coins, CheckCircle, Flame } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 interface FeedCardProps {
   event: FeedEvent;
@@ -29,6 +31,19 @@ export default function FeedCard({ event, users, onYes, onNo }: FeedCardProps) {
   const p = payload as any;
   const actor = users.get(user_id);
   const actorName = actor?.name ?? "Someone";
+  const navigate = useNavigate();
+  const { groupId } = useParams<{ groupId: string }>();
+  const { user: currentUser } = useAuth();
+
+  const roastLink = (targetId: string, targetUser: FeedUser | undefined, triggerType: string, reason: string) => {
+    const params = new URLSearchParams({
+      trigger: triggerType,
+      reason,
+      name: targetUser?.name || "Someone",
+      color: targetUser?.avatar_color || "#7B9EC8",
+    });
+    navigate(`/group/${groupId}/roast/${targetId}?${params.toString()}`);
+  };
 
   switch (event_type) {
     case "bet_placed": {
@@ -86,6 +101,7 @@ export default function FeedCard({ event, users, onYes, onNo }: FeedCardProps) {
     case "roast_sent": {
       const toUser = users.get(p.to_user_id);
       const toName = toUser?.name ?? "Someone";
+      const isRecipient = currentUser?.id === p.to_user_id;
       return (
         <div className="flex gap-3">
           <UserAvatar user={actor} />
@@ -94,12 +110,22 @@ export default function FeedCard({ event, users, onYes, onNo }: FeedCardProps) {
               <span className="font-semibold text-t-0">{actorName}</span> roasted{" "}
               <span className="font-semibold text-t-0">{toName}</span>
             </p>
-            <div className="rounded-card bg-bg-2 border border-b-0 p-3">
-              <p className="text-sm text-t-0 italic">"{p.message}"</p>
+            <div className="rounded-card bg-roast-bg border border-roast-border p-3">
+              <p className="text-sm text-roast italic">"{p.message}"</p>
             </div>
-            {p.has_reply && (
-              <button className="text-xs text-yes font-semibold">replied ↗</button>
-            )}
+            <div className="flex gap-2">
+              {p.has_reply && (
+                <button className="text-xs text-yes font-semibold">replied ↗</button>
+              )}
+              {isRecipient && (
+                <button
+                  onClick={() => roastLink(user_id, actor, "bet_loss", `Roasted you`)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-roast"
+                >
+                  <Flame className="h-3 w-3" /> Fire back
+                </button>
+              )}
+            </div>
           </div>
         </div>
       );
