@@ -47,22 +47,65 @@ const Notifications = React.forwardRef<HTMLDivElement>((_, ref) => {
               <p className="text-sm text-t-1">No notifications yet.</p>
             </div>
           ) : (
-            notifications.map((n) => (
-              <div
-                key={n.id}
-                className={`flex items-start gap-3 py-3 px-3 rounded-card ${
-                  !n.read ? "bg-bg-1 border border-b-0" : ""
-                }`}
-              >
-                <div className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${!n.read ? "bg-yes" : "bg-transparent"}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-t-0">{typeLabel(n.type)}</p>
-                  <p className="text-xs text-t-2 mt-0.5">
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                  </p>
+            notifications.map((n) => {
+              const pl = n.payload as any;
+              if (n.type === "roast_received") {
+                return (
+                  <div
+                    key={n.id}
+                    className={`rounded-card py-3 px-3 space-y-2 ${
+                      !n.read ? "bg-roast-bg border border-roast-border" : "bg-bg-1 border border-b-0"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Flame className="h-4 w-4 text-roast shrink-0" />
+                      <p className="text-sm font-semibold text-t-0 flex-1">
+                        {pl?.from_name || "Someone"} roasted you
+                      </p>
+                      <span className="text-[10px] text-t-2">
+                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                    {pl?.message && (
+                      <p className="text-xs text-roast italic pl-6">"{pl.message}"</p>
+                    )}
+                    <div className="flex gap-2 pl-6">
+                      <button
+                        onClick={() => {
+                          const params = new URLSearchParams({
+                            trigger: "bet_loss",
+                            reason: "Roasted you",
+                            name: pl?.from_name || "Someone",
+                            color: "#7B9EC8",
+                          });
+                          navigate(`/group/${pl?.group_id}/roast/${pl?.from_user_id}?${params.toString()}`);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-roast"
+                      >
+                        <Flame className="h-3 w-3" /> Fire back
+                      </button>
+                      <button className="text-xs text-t-2 font-medium">Ignore</button>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={n.id}
+                  className={`flex items-start gap-3 py-3 px-3 rounded-card ${
+                    !n.read ? "bg-bg-1 border border-b-0" : ""
+                  }`}
+                >
+                  <div className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${!n.read ? "bg-yes" : "bg-transparent"}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-t-0">{typeLabel(n.type)}</p>
+                    <p className="text-xs text-t-2 mt-0.5">
+                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
