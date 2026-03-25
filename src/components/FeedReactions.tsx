@@ -62,8 +62,8 @@ export default function FeedReactions({ eventId, groupId, reactions, userId }: F
       ))}
       <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
         <PopoverTrigger asChild>
-          <button className="h-7 px-2 rounded-pill text-xs text-t-2 bg-bg-2 border border-b-0 hover:border-b-1 transition-all">
-            + react
+          <button className="h-7 w-7 flex items-center justify-center text-base opacity-50 hover:opacity-80 active:scale-90 transition-all">
+            😀⁺
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2 bg-bg-2 border border-b-1" align="start" sideOffset={4}>
