@@ -2,7 +2,7 @@ import React from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import BottomNav from "@/components/BottomNav";
-import { ArrowLeft, Bell, CheckCheck } from "lucide-react";
+import { ArrowLeft, Bell, CheckCheck, Flame } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 
