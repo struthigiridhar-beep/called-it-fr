@@ -38,7 +38,7 @@ const RoastComposer = React.forwardRef<HTMLDivElement>((_, ref) => {
   const presets = PRESETS[trigger] || PRESETS.bet_loss;
 
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
-  const [customMode, setCustomMode] = useState(false);
+  const [customMode, setCustomMode] = useState(true);
   const [customText, setCustomText] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -154,13 +154,13 @@ const RoastComposer = React.forwardRef<HTMLDivElement>((_, ref) => {
         {/* Presets / Custom toggle */}
         <div className="flex items-center justify-between mt-6 mb-3">
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-t-2">
-            {trigger === "streak_break" ? "STREAK BREAK ROASTS" : "BET LOSS ROASTS"}
+            {customMode ? "WRITE YOUR ROAST" : trigger === "streak_break" ? "STREAK BREAK ROASTS" : "BET LOSS ROASTS"}
           </h2>
           <button
             onClick={() => setCustomMode(!customMode)}
             className="text-xs text-roast font-semibold"
           >
-            ✏️ {customMode ? "Use a preset instead" : "Write your own"}
+            {customMode ? "🔥 Use a preset" : "✏️ Write your own"}
           </button>
         </div>
 
