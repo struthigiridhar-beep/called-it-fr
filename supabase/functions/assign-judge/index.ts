@@ -145,6 +145,19 @@ Deno.serve(async (req) => {
       });
 
       results.push(`${market.id}: judge assigned → ${judgeId}`);
+
+      // Trigger crew role recompute for this group
+      try {
+        const recomputeUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/recompute-crew-roles`;
+        await fetch(recomputeUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({ group_id: groupId }),
+        });
+      } catch (_) { /* best-effort */ }
     }
 
     return new Response(
