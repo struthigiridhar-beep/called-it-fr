@@ -50,29 +50,44 @@ export default function FeedReactions({ eventId, groupId, reactions, userId }: F
         <button
           key={emoji}
           onClick={() => toggle(emoji)}
-          className={`h-7 px-2 rounded-pill text-xs flex items-center gap-1 transition-all active:scale-90 ${
-            myId
-              ? "bg-bg-3 border border-b-2"
-              : "bg-bg-2 border border-b-0 hover:border-b-1"
-          }`}
+          className="flex items-center gap-1 transition-all active:scale-90"
+          style={{
+            background: myId ? "#222018" : "#1A1714",
+            border: `1px solid ${myId ? "#3A3430" : "#222018"}`,
+            borderRadius: 99,
+            padding: "5px 10px",
+            fontSize: 12,
+            color: "#9A8E84",
+          }}
         >
           <span className="text-sm">{emoji}</span>
-          <span className="font-mono-num text-t-2">{count}</span>
+          <span style={{ fontFamily: "monospace", color: "#5C5248" }}>{count}</span>
         </button>
       ))}
       <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
         <PopoverTrigger asChild>
-          <button className="h-7 w-7 flex items-center justify-center text-base opacity-50 hover:opacity-80 active:scale-90 transition-all">
-            😀⁺
+          <button
+            className="flex items-center justify-center active:scale-90 transition-all"
+            style={{
+              background: "#1A1714",
+              border: "1px solid #222018",
+              borderRadius: 99,
+              padding: "5px 10px",
+              fontSize: 12,
+              color: "#4A4038",
+            }}
+          >
+            +
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-2 bg-bg-2 border border-b-1" align="start" sideOffset={4}>
+        <PopoverContent className="w-auto p-2" style={{ background: "#1A1714", border: "1px solid #222018" }} align="start" sideOffset={4}>
           <div className="flex gap-1">
             {EMOJI_PICKER.map((e) => (
               <button
                 key={e}
                 onClick={() => toggle(e)}
-                className="h-9 w-9 rounded-button flex items-center justify-center text-lg hover:bg-bg-3 active:scale-90 transition-all"
+                className="h-9 w-9 rounded-full flex items-center justify-center text-lg active:scale-90 transition-all"
+                style={{ color: "#9A8E84" }}
               >
                 {e}
               </button>
