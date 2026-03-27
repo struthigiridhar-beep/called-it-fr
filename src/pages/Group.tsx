@@ -635,7 +635,7 @@ export default function Group() {
                         <div
                           className={`flex items-end gap-2 px-4 mb-[10px] ${alignRight ? "flex-row-reverse" : ""}`}
                         >
-                          <ChatAvatar user={actor} />
+                          <ChatAvatar user={actor} userId={e.user_id} />
                           <div className={`flex-1 min-w-0 flex flex-col ${alignRight ? "items-end" : "items-start"}`}>
                             <SenderLabel event={e} users={feedUsersMap} isSelf={isSelf} />
                             <Bubble event={e} users={feedUsersMap} isSelf={isSelf} onYes={onYes} onNo={onNo} />
@@ -707,6 +707,7 @@ export default function Group() {
                           <div
                             className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
                             style={{ backgroundColor: entry.avatar_color }}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/profile/${entry.user_id}`); }}
                           >
                             {getInitials(entry.name)}
                           </div>
