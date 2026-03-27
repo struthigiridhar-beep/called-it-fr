@@ -71,16 +71,18 @@ const RoastComposer = React.forwardRef<HTMLDivElement>((_, ref) => {
 
       if (roastErr) throw roastErr;
 
-      // 3. Insert notification for recipient
-      await supabase.from("notifications").insert({
-        user_id: toUserId,
-        type: "roast_received",
-        payload: {
-          from_name: senderUser?.name || "Someone",
-          from_user_id: user.id,
-          message: activeMessage.trim(),
-          group_id: groupId,
-          roast_id: roast?.id,
+      // 3. Insert notification for recipient via edge function (bypasses RLS)
+      await supabase.functions.invoke("send-notification", {
+        body: {
+          user_id: toUserId,
+          type: "roast_received",
+          payload: {
+            from_name: senderUser?.name || "Someone",
+            from_user_id: user.id,
+            message: activeMessage.trim(),
+            group_id: groupId,
+            roast_id: roast?.id,
+          },
         },
       });
 

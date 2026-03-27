@@ -144,18 +144,20 @@ export default function CreateMarketSheet({ open, onOpenChange, groupId, groupNa
           .neq("user_id", user.id);
 
         if (members?.length) {
-          await supabase.from("notifications").insert(
-            members.map((m) => ({
-              user_id: m.user_id,
-              type: "new_market",
-              payload: {
-                market_id: market.id,
-                question: question.trim(),
-                group_name: groupName,
-                created_by_name: user.email?.split("@")[0] ?? "Someone",
-              },
-            }))
-          );
+          await supabase.functions.invoke("send-notification", {
+            body: {
+              notifications: members.map((m) => ({
+                user_id: m.user_id,
+                type: "new_market",
+                payload: {
+                  market_id: market.id,
+                  question: question.trim(),
+                  group_name: groupName,
+                  creator_name: user.email?.split("@")[0] ?? "Someone",
+                },
+              })),
+            },
+          });
         }
       }
 
