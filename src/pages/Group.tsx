@@ -20,7 +20,12 @@ import FeedCard from "@/components/FeedCard";
 import FeedReactions from "@/components/FeedReactions";
 import { isToday, isYesterday, format as fmtDate } from "date-fns";
 import { useGroupLeaderboard, type LeaderboardEntry } from "@/hooks/useGroupLeaderboard";
+import { useActiveDispute } from "@/hooks/useActiveDispute";
 import { useQuery } from "@tanstack/react-query";
+import { getISOWeek } from "date-fns";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Progress } from "@/components/ui/progress";
+import { ChevronDown } from "lucide-react";
 
 type Tab = "markets" | "feed" | "board" | "create";
 type Side = "yes" | "no";
@@ -88,7 +93,9 @@ export default function Group() {
   const { pendingMarkets: pendingVerdicts } = useJudgeAssignment(groupId, uid);
   const { events, reactions, users: feedUsers } = useGroupFeed(groupId);
   const feedUsersMap = new Map(feedUsers.map((u) => [u.id, u]));
-  const { leaderboard } = useGroupLeaderboard(groupId);
+  const { leaderboard, mostOverconfidentId } = useGroupLeaderboard(groupId);
+  const { activeDispute } = useActiveDispute(groupId);
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
   // User data for first_bet_at
   const { data: userData } = useQuery({
@@ -593,32 +600,182 @@ export default function Group() {
           )}
 
           {tab === "board" && (
-            <div className="mt-4 space-y-3">
-              <h3 className="text-base font-semibold text-t-0">Leaderboard</h3>
+            <div className="mt-4 space-y-4">
+              {/* Week header */}
+              <div>
+                <h3 className="text-base font-bold text-t-0">
+                  Week {getISOWeek(new Date())} · XP standings
+                </h3>
+                <p className="text-xs text-t-2">{group?.name ?? "Group"}</p>
+              </div>
+
               {leaderboard.length === 0 ? (
                 <p className="text-sm text-t-1">No data yet.</p>
               ) : (
                 <div className="space-y-1">
-                  {leaderboard.map((entry, i) => (
-                    <div key={entry.user_id} className="flex items-center gap-3 rounded-card bg-bg-1 border border-b-0 p-3">
-                      <span className="text-sm font-bold font-mono-num text-t-2 w-6 text-center">{i + 1}</span>
-                      <div
-                        className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                        style={{ backgroundColor: entry.avatar_color }}
-                      >
-                        {getInitials(entry.name)}
+                  {leaderboard.map((entry, i) => {
+                    const isYou = entry.user_id === uid;
+                    const isFirst = i === 0;
+                    const isOverconfident = entry.user_id === mostOverconfidentId;
+                    const isExpanded = expandedUser === entry.user_id;
+
+                    const roleConfig: Record<string, { emoji: string; label: string; color: string }> = {
+                      prophetic: { emoji: "🔮", label: "Prophetic", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
+                      wildcard: { emoji: "🎲", label: "Wildcard", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+                      hyped: { emoji: "🔥", label: "HypedUp", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+                      judge: { emoji: "⚖️", label: "Judge", color: "bg-green-500/20 text-green-400 border-green-500/30" },
+                      creator: { emoji: "🏗️", label: "Creator", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+                    };
+                    const role = entry.crew_role ? roleConfig[entry.crew_role] : null;
+
+                    return (
+                      <div key={entry.user_id}>
+                        <button
+                          onClick={() => setExpandedUser(isExpanded ? null : entry.user_id)}
+                          className="w-full flex items-center gap-3 rounded-card bg-bg-1 border border-b-0 p-3 text-left transition-colors active:bg-bg-2"
+                        >
+                          {/* Rank */}
+                          <span className={`text-sm font-bold font-mono-num w-6 text-center ${isFirst ? "text-coin" : "text-t-2"}`}>
+                            {i + 1}
+                          </span>
+
+                          {/* Avatar */}
+                          <div
+                            className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                            style={{ backgroundColor: entry.avatar_color }}
+                          >
+                            {getInitials(entry.name)}
+                          </div>
+
+                          {/* Name + badges */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-sm font-semibold text-t-0 truncate">
+                                {entry.name}
+                              </span>
+                              {isYou && (
+                                <span className="text-[10px] text-t-2">(you)</span>
+                              )}
+                              {role && (
+                                <span className={`inline-flex items-center gap-0.5 rounded-pill px-1.5 py-0.5 text-[10px] font-semibold border ${role.color}`}>
+                                  {role.emoji} {role.label}
+                                </span>
+                              )}
+                              {entry.streak > 1 && (
+                                <span className="text-[10px] font-semibold text-coin">
+                                  🔥 {entry.streak}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {entry.accuracy !== null && (
+                                <span className="text-[10px] font-mono-num text-t-2">
+                                  {entry.accuracy}% accuracy
+                                </span>
+                              )}
+                              {isOverconfident && (
+                                <span className="inline-flex items-center rounded-pill px-1.5 py-0.5 text-[9px] font-semibold bg-coin-bg border border-coin-border text-coin">
+                                  Most overconfident
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* XP */}
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold font-mono-num text-coin">{entry.xp} XP</p>
+                            <p className="text-[10px] font-mono-num text-t-2">{entry.coins} c</p>
+                          </div>
+
+                          <ChevronDown className={`h-3.5 w-3.5 text-t-2 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {/* Expanded streak history */}
+                        {isExpanded && (
+                          <div className="bg-bg-1 border border-t-0 border-b-0 rounded-b-card px-4 pb-3 -mt-1">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-t-2 mb-1.5">Streak history</p>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {entry.streak > 0 ? (
+                                <>
+                                  {Array.from({ length: Math.min(entry.streak, 10) }).map((_, si) => (
+                                    <span
+                                      key={si}
+                                      className="h-5 w-5 rounded-full bg-coin-bg border border-coin-border flex items-center justify-center text-[9px] font-bold text-coin"
+                                    >
+                                      {si + 1}
+                                    </span>
+                                  ))}
+                                  <span className="text-[9px] text-t-2 ml-1">active</span>
+                                </>
+                              ) : (
+                                <span className="text-[10px] text-t-2">No active streak</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-t-0 truncate">{entry.name}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold font-mono-num text-coin">{entry.xp} XP</p>
-                        <p className="text-[10px] font-mono-num text-t-2">{entry.coins} c</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
+
+              {/* Active dispute card */}
+              {activeDispute && (
+                <button
+                  onClick={() => navigate(`/group/${groupId}/dispute/${activeDispute.dispute_id}`)}
+                  className="w-full rounded-card bg-no-bg border border-no-border p-4 space-y-3 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-no animate-pulse" />
+                    <span className="text-sm font-bold text-no">Verdict disputed</span>
+                  </div>
+                  <p className="text-sm text-t-1 leading-snug">"{activeDispute.question}"</p>
+                  <p className="text-xs text-t-2">Judge: {activeDispute.judge_name}</p>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-t-2">
+                      <span>Flags</span>
+                      <span className="font-mono-num">
+                        {activeDispute.flags} / {Math.floor(activeDispute.member_count / 2) + 1}
+                      </span>
+                    </div>
+                    <Progress
+                      value={(activeDispute.flags / (Math.floor(activeDispute.member_count / 2) + 1)) * 100}
+                      className="h-1.5 bg-bg-2"
+                    />
+                  </div>
+                  <p className="text-[10px] text-t-2">
+                    Coins locked: <span className="font-mono-num text-coin">{activeDispute.total_pool} c</span> · released on resolution
+                  </p>
+                  <p className="text-[10px] text-no font-semibold">
+                    {(() => {
+                      const end = new Date(new Date(activeDispute.verdict_committed_at).getTime() + 12 * 60 * 60 * 1000);
+                      const diff = end.getTime() - Date.now();
+                      if (diff <= 0) return "Window closed";
+                      const h = Math.floor(diff / 3600000);
+                      const m = Math.floor((diff % 3600000) / 60000);
+                      return `${h}h ${m}m remaining`;
+                    })()}
+                  </p>
+                </button>
+              )}
+
+              {/* Crew roles info */}
+              <Accordion type="single" collapsible className="border-none">
+                <AccordionItem value="roles" className="border border-b-0 rounded-card bg-bg-1 overflow-hidden">
+                  <AccordionTrigger className="px-4 py-3 text-xs font-semibold text-t-1 hover:no-underline">
+                    Crew roles · what do they mean?
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4">
+                    <div className="space-y-2 text-xs text-t-2">
+                      <p><span className="text-purple-400">🔮 Prophetic</span> — Highest bet accuracy % (min 5 settled bets)</p>
+                      <p><span className="text-amber-400">🎲 Wildcard</span> — Most bets placed against &gt;70% majority odds</p>
+                      <p><span className="text-red-400">🔥 HypedUp</span> — Most reactions sent across all feed events</p>
+                      <p><span className="text-green-400">⚖️ Judge</span> — Highest judge integrity score (min 2 assignments)</p>
+                      <p><span className="text-blue-400">🏗️ Creator</span> — Most markets created in the group</p>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           )}
         </div>
