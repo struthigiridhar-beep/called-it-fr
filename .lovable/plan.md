@@ -1,80 +1,209 @@
+Fix event coverage on Feed tab and rebuild Alerts tab with correct notification types.
 
+Touch: src/pages/Group.tsx (feed section and alerts section), src/components/NotificationItem.tsx or equivalent alerts render component.
 
-## Chat-Style Feed Redesign
+Do NOT touch: data fetching hooks, Supabase queries, routing, bet sheet, roast composer, Board tab, Markets tab, FeedCard chat bubble structure.
 
-Rewrite the feed rendering in two files to match the WhatsApp-style chat layout from the screenshot. No data/hook/routing changes.
+---
 
-### Architecture
+PART 1 — Feed tab: ensure all 4 event types render correctly
 
-**FeedCard.tsx** becomes a "bubble renderer" — it returns only the bubble content + sender label + actions row. The outer chat row structure (avatar placement, left/right alignment, timestamp) moves to **Group.tsx**.
+Events table contains exactly these event_type values:
 
-FeedCard gets a new prop `isSelf: boolean` and exports helper components.
+  bet_placed | roast_sent | market_created | market_settled
 
-### File 1: `src/components/FeedCard.tsx`
+Ensure there is an explicit render case for all four in the feed map. No fallthrough to null.
 
-Complete rewrite. The component returns a fragment with three parts that Group.tsx positions:
+market_settled — add this render case if missing:
 
-**A) `SenderLabel` — rendered above bubble**
-- `roast_sent`: `<span style={{color:"#C47860", fontWeight:700}}>{actor}</span> roasted <span style={{color:"#9A8E84", fontWeight:600}}>{target}</span>`
-- `bet_placed`: self → "you placed a bet", other → "{name} placed a bet"
-- `market_created`: "{name} created a market" + inline NEW pill (`bg:#0E1820`, border `#1E3048`, color `#7B9EC8`, 9px, 800 weight)
-- Other types: "{name} {event_type}"
-- All in font-size 12px, color `#5C5248`
+  Sender label: "market settled" in muted #5C5248 (no avatar — center-aligned full width label)
 
-**B) `Bubble` — the main content**
-- **Roast**: `bg:#1C0C08`, border `1px solid #3A1810`, border-radius 14px, padding 12px 14px. Text 15px, `#EAE4DC`, italic, weight 500. Decorative quotes in `#C47860`, 20px, bold.
-- **Bet (other)**: `bg:#1E1A17`, border-radius `14px 14px 14px 4px`, padding 11px 13px. YES chip (`bg:#0E1820`, border `#1E3048`, color `#7B9EC8`) or NO chip (`bg:#221410`, border `#442820`, color `#C47860`), 12px bold. Amount monospace `#C8A860` 15px bold. Question 13px `#9A8E84`.
-- **Bet (self)**: `bg:#0F1E10`, border `1px solid #1A3020`, border-radius `14px 14px 4px 14px`. Same inner content.
-- **Market**: Always left-aligned. `bg:#1E1A17`, border-radius 14px, padding 12px 13px. Question 15px bold `#EAE4DC`. YES/NO buttons in flex row, gap 7px, each flex-1, border-radius 9px, padding 9px. YES: `bg:#0E1820` border `#1E3048` color `#7B9EC8`. NO: `bg:#221410` border `#442820` color `#C47860`. Same onYes/onNo handlers.
-- **Other types** (coins_sent, streak, settled, reset): keep current styling but remove outer card wrapper — just the inner content as a bubble with `bg:#1E1A17` border-radius 14px.
+  Bubble: bg #1E1A17, border-radius 14px, padding 11px 13px, align center, max-width 100%
 
-**C) `ActionsRow` — below bubble**
-- Roast: "🔥 Fire back" pill (left) + reaction chips + add-react (right). Fire back pill: `bg:#1C0906`, border `#38140C`, rounded-full, 12px, `#C47860`, weight 700. Only if isRecipient.
-- Bet (others): reactions left + "🔥 Roast" pill right (`ml-auto`). Same roastLink handler.
-- Bet (self): reactions only, `justify-end`.
-- Market: add-react button only.
+  Content:
 
-**Avatar**: 32px circle, `bg:#272220`, initials 11px bold `#9A8E84`. Remove avatar_color usage — uniform dark avatar.
+    Line 1: question text — font-size 13px, font-weight 600, color #EAE4DC, truncated 1 line
 
-### File 2: `src/pages/Group.tsx` (feed section, lines 549-599)
+    Line 2: verdict pill + outcome text
 
-**Day separators** (replace lines 568-571):
-```
-<div className="flex items-center gap-[10px] px-4 py-[10px]">
-  <div className="h-px flex-1 bg-[#1E1A17]" />
-  <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.1em",color:"#3A3230"}} className="uppercase">
-    {dateLabel === "Today" ? "TODAY" : fmtDate(d, "MMM d").toUpperCase()}
-  </span>
-  <div className="h-px flex-1 bg-[#1E1A17]" />
-</div>
-```
+      YES pill: bg #0E1820, border 1px solid #1E3048, border-radius 5px,
 
-**Feed container**: Remove `space-y-1`. No outer card wrapper per event (remove the `rounded-card border border-b-0 bg-bg-1 p-3` div). Events sit on page bg.
+        font-size 12px, font-weight 800, color #7B9EC8, padding 2px 8px
 
-**Each event row** — Group.tsx builds the chat row:
-```
-const isSelf = e.user_id === uid;
-const isRoast = e.event_type === "roast_sent";
-const isMarket = e.event_type === "market_created";
-const alignRight = isSelf && !isRoast && !isMarket;
-```
+      NO pill: bg #221410, border 1px solid #442820, border-radius 5px,
 
-Row structure:
-- `flex items-end gap-2 px-4 mb-[10px]` + `flex-row-reverse` if alignRight
-- Avatar (32px) — `self-end`
-- Content column (`flex-1 min-w-0` + `items-end` if alignRight)
-  - SenderLabel
-  - Bubble
-  - ActionsRow with FeedReactions integrated
-- Timestamp (`text-[10px] font-mono text-[#3E3830] self-end pb-1`) — formatDistanceToNow or time
+        font-size 12px, font-weight 800, color #C47860, padding 2px 8px
 
-**FeedReactions** styling update: reaction chips get `bg:#1A1714`, border `#222018`, rounded-full, 12px, color `#9A8E84`. Count monospace `#5C5248`. Add-react button same bg/border, color `#4A4038`.
+      After pill: "· verdict is in" in font-size 12px, color #9A8E84, margin-left 6px
 
-### Files touched
-- `src/components/FeedCard.tsx` — full rewrite
-- `src/pages/Group.tsx` — lines 549-599 (feed section only)
-- `src/components/FeedReactions.tsx` — styling only (chip colors)
+  Pull from: event.payload.question, event.payload.verdict
 
-### Not touched
-Data fetching, hooks, Supabase queries, routing, Board tab, Markets tab, bet sheet, roast composer, reaction toggle logic.
+  Do NOT attempt to render winner_ids or coin amounts — they are not in the payload
 
+  No roast button. No fire back. Reactions only (FeedReactions as normal).
+
+  This event is always center-aligned — not left or right. No avatar. Full width bubble.
+
+---
+
+PART 2 — Clean up and rebuild Alerts tab
+
+Before rendering, filter out any notification where type === 'bet_placed' — return null, do not render. These are legacy junk rows.
+
+Alerts tab is a flat list of rows. NOT chat bubbles. Do not use FeedCard or FeedReactions here.
+
+ALERT ROW structure (all types):
+
+  display flex, align-items flex-start, gap 12px, padding 14px 16px
+
+  border-bottom: 1px solid #1A1714
+
+  background: unread → #171412, read → #100E0C
+
+  On tap: mark notification as read (existing handler), then navigate to relevant screen
+
+  Left: icon circle
+
+    36px, border-radius 99px, display flex, align-items center, justify-content center
+
+    font-size 18px (emoji)
+
+  Middle: text block, flex 1, min-width 0
+
+    Title: font-size 14px, font-weight 600, color #EAE4DC, margin-bottom 2px
+
+    Subtitle: font-size 12px, color #5C5248, line-height 1.4
+
+  Right column: display flex, flex-direction column, align-items flex-end, gap 6px, flex-shrink 0
+
+    Timestamp: font-size 10px, font-family monospace, color #3E3830
+
+    Unread dot: 6px circle, bg #7B9EC8, border-radius 99px. Only show if ![notification.read](http://notification.read)
+
+TYPE DEFINITIONS (match notification.type exactly):
+
+'roast_received':
+
+  Icon: bg #1C0906, border 1px solid #38140C, emoji 🔥
+
+  Title: "[payload.from_name] roasted you"
+
+  Subtitle: payload.message truncated to 60 chars
+
+  Action on tap: navigate to group feed
+
+'judge_assigned':
+
+  Icon: bg #0C1A0A, border 1px solid #2A4A20, emoji ⚖️
+
+  Title: "You're the judge"
+
+  Subtitle: payload.question truncated to 60 chars
+
+  Below subtitle: "Give verdict →" inline CTA
+
+    bg #0C1A0A, border 1px solid #2A4A20, border-radius 99px
+
+    padding 4px 10px, font-size 11px, color #7AB870, font-weight 600
+
+    display inline-block, margin-top 6px
+
+    onClick: navigate to judge screen for [payload.market](http://payload.market)_id
+
+'verdict_in':
+
+  Icon: bg #0E1820, border 1px solid #1E3048, emoji 🔮
+
+  Title: "Verdict in · " + verdict pill inline
+
+    YES: color #7B9EC8 | NO: color #C47860 | font-weight 800
+
+  Subtitle: payload.question truncated to 50 chars
+
+  Action: navigate to group feed
+
+'dispute_triggered':
+
+  Icon: bg #1C0906, border 1px solid #38140C, emoji 🚩
+
+  Title: "Verdict disputed"
+
+  Subtitle: payload.question truncated to 50 chars + " · " + payload.flag_count + "/3 flags"
+
+  Action: navigate to re-vote screen for [payload.market](http://payload.market)_id
+
+'dispute_resolved':
+
+  Icon: bg #1A1714, border 1px solid #2A2420, emoji ✅
+
+  Title: "Dispute resolved"
+
+  Subtitle: payload.question truncated to 50 chars
+
+  Action: navigate to group feed
+
+'market_closing_soon':
+
+  Icon: bg #1C1608, border 1px solid #362810, emoji ⏳
+
+  Title: "Closing soon"
+
+  Subtitle: payload.question truncated to 50 chars + " · " + payload.hours_left + "h left"
+
+  Action: navigate to Markets tab
+
+'new_market':
+
+  Icon: bg #0E1820, border 1px solid #1E3048, emoji 📊
+
+  Title: payload.creator_name + " opened a market"
+
+  Subtitle: payload.question truncated to 60 chars
+
+  Action: navigate to Markets tab
+
+'market_about_you':
+
+  Icon: bg #241A30, border 1px solid #382A50, emoji 👀
+
+  Title: "There's a market about you"
+
+  Subtitle: payload.question truncated to 60 chars
+
+  Action: navigate to Markets tab
+
+Any unknown type including 'bet_placed': return null silently.
+
+EMPTY STATE (zero notifications or all filtered out):
+
+  Full screen centered, flex column, align-items center, justify-content center
+
+  Main text: "Nothing here yet" — font-size 14px, font-weight 500, color #5C5248
+
+  Sub text: "Roasts, judge assignments, and verdicts show up here."
+
+    font-size 12px, color #4A4038, margin-top 6px, max-width 220px, text-align center
+
+MARK ALL READ:
+
+  Header right of Alerts screen
+
+  Only visible if unread count > 0
+
+  font-size 12px, color #7B9EC8, padding 4px 8px, cursor pointer
+
+  onClick: existing mark-all-read handler — do not change, do not rewrite
+
+---
+
+PART 3 — Visual separation: Feed vs Alerts must look completely different
+
+Feed: chat thread, bubbles, avatars, time-ordered, social
+
+Alerts: flat notification list, icon circles, no bubbles, no avatars, action-oriented
+
+If any Alerts rows currently use FeedCard, chat bubble styling, or FeedReactions — remove and replace with the row structure above. These are separate UI paradigms and must not share components.
+
+---
+
+Reference the design system tokens shared at the start. Dark backgrounds only. Monospace for all numbers and percentages.
