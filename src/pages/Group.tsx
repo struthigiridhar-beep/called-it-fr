@@ -657,6 +657,7 @@ export default function Group() {
                         </div>
                       </div>
                     );
+                  });
                 })()
               )}
             </div>
