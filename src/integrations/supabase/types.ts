@@ -654,6 +654,7 @@ export type Database = {
           first_bet_at: string | null
           id: string
           name: string
+          status_text: string | null
         }
         Insert: {
           avatar_color?: string
@@ -661,6 +662,7 @@ export type Database = {
           first_bet_at?: string | null
           id: string
           name?: string
+          status_text?: string | null
         }
         Update: {
           avatar_color?: string
@@ -668,6 +670,7 @@ export type Database = {
           first_bet_at?: string | null
           id?: string
           name?: string
+          status_text?: string | null
         }
         Relationships: []
       }
