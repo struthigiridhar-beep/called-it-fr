@@ -235,44 +235,41 @@ export function Bubble({ event, users, isSelf, onYes, onNo }: FeedCardProps) {
     case "market_settled": {
       const verdict = p.verdict as string;
       const question = p.question as string;
-      const payouts = (p.payouts ?? []) as { user_id: string; amount: number }[];
       const isYes = verdict === "yes";
       return (
-        <div style={{ background: "#1E1A17", borderRadius: 14, padding: "11px 13px" }}>
-          {question && <p style={{ fontSize: 13, color: "#9A8E84", marginBottom: 6, lineHeight: 1.35 }}>"{question}"</p>}
-          <span
-            style={{
-              display: "inline-flex",
-              background: isYes ? "#0E1820" : "#221410",
-              border: `1px solid ${isYes ? "#1E3048" : "#442820"}`,
-              borderRadius: 5,
-              fontSize: 12,
-              fontWeight: 800,
-              padding: "3px 8px",
-              color: isYes ? "#7B9EC8" : "#C47860",
-            }}
-          >
-            {verdict?.toUpperCase()}
-          </span>
-          {payouts.length > 0 && (
-            <div className="space-y-1 pt-2">
-              {payouts.map((po, i) => {
-                const u = users.get(po.user_id);
-                return (
-                  <div key={i} className="flex items-center gap-2" style={{ fontSize: 12 }}>
-                    <div
-                      className="h-5 w-5 rounded-full flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: "#272220", color: "#9A8E84", fontSize: 8, fontWeight: 700 }}
-                    >
-                      {u ? getInitials(u.name) : "??"}
-                    </div>
-                    <span style={{ color: "#9A8E84" }} className="truncate">{u?.name ?? "User"}</span>
-                    <span style={{ fontFamily: "monospace", color: "#C8A860", fontWeight: 600, marginLeft: "auto" }}>+{po.amount} c</span>
-                  </div>
-                );
-              })}
-            </div>
+        <div style={{ background: "#1E1A17", borderRadius: 14, padding: "11px 13px", textAlign: "center", width: "100%" }}>
+          {question && (
+            <p
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#EAE4DC",
+                lineHeight: 1.35,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {question}
+            </p>
           )}
+          <div className="flex items-center justify-center gap-1.5" style={{ marginTop: 6 }}>
+            <span
+              style={{
+                display: "inline-flex",
+                background: isYes ? "#0E1820" : "#221410",
+                border: `1px solid ${isYes ? "#1E3048" : "#442820"}`,
+                borderRadius: 5,
+                fontSize: 12,
+                fontWeight: 800,
+                padding: "2px 8px",
+                color: isYes ? "#7B9EC8" : "#C47860",
+              }}
+            >
+              {verdict?.toUpperCase()}
+            </span>
+            <span style={{ fontSize: 12, color: "#9A8E84", marginLeft: 6 }}>· verdict is in</span>
+          </div>
         </div>
       );
     }
