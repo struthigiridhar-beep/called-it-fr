@@ -179,7 +179,7 @@ export type Database = {
         Row: {
           created_at: string | null
           event_type: string
-          group_id: string
+          group_id: string | null
           id: string
           payload: Json
           user_id: string
@@ -187,7 +187,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           event_type: string
-          group_id: string
+          group_id?: string | null
           id?: string
           payload: Json
           user_id: string
@@ -195,7 +195,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           event_type?: string
-          group_id?: string
+          group_id?: string | null
           id?: string
           payload?: Json
           user_id?: string
