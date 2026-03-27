@@ -566,7 +566,8 @@ export default function Group() {
                     const isSelf = e.user_id === uid;
                     const isRoast = e.event_type === "roast_sent";
                     const isMarket = e.event_type === "market_created";
-                    const alignRight = isSelf && !isRoast && !isMarket;
+                    const isSettled = e.event_type === "market_settled";
+                    const alignRight = isSelf && !isRoast && !isMarket && !isSettled;
                     const actor = feedUsersMap.get(e.user_id);
 
                     const timeStr = d ? fmtDate(d, "h:mm a").toLowerCase() : "";
@@ -579,6 +580,43 @@ export default function Group() {
                       const m = [...groupMarkets, ...publicMarkets].find((x) => x.id === mId);
                       if (m) openSheet(m, "no");
                     };
+
+                    // market_settled: center-aligned, no avatar, full width
+                    if (isSettled) {
+                      return (
+                        <div key={e.id}>
+                          {showSeparator && dateLabel && (
+                            <div className="flex items-center gap-[10px] px-4 py-[10px]">
+                              <div className="h-px flex-1" style={{ background: "#1E1A17" }} />
+                              <span
+                                className="uppercase"
+                                style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#3A3230" }}
+                              >
+                                {dateLabel === "Today" ? "TODAY" : dateLabel === "Yesterday" ? "YESTERDAY" : fmtDate(d!, "MMM d").toUpperCase()}
+                              </span>
+                              <div className="h-px flex-1" style={{ background: "#1E1A17" }} />
+                            </div>
+                          )}
+                          <div className="px-4 mb-[10px] flex flex-col items-center">
+                            <div style={{ fontSize: 12, color: "#5C5248", paddingBottom: 4 }}>market settled</div>
+                            <Bubble event={e} users={feedUsersMap} isSelf={false} onYes={onYes} onNo={onNo} />
+                            <div className="flex items-center gap-1.5 pt-[5px]">
+                              <FeedReactions
+                                eventId={e.id}
+                                groupId={groupId!}
+                                reactions={eventReactions}
+                                userId={uid}
+                              />
+                            </div>
+                            <span
+                              style={{ fontSize: 10, fontFamily: "monospace", color: "#3E3830", marginTop: 4 }}
+                            >
+                              {timeStr}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div key={e.id}>
@@ -619,7 +657,6 @@ export default function Group() {
                         </div>
                       </div>
                     );
-                  });
                 })()
               )}
             </div>
