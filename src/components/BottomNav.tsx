@@ -26,7 +26,7 @@ export default function BottomNav() {
           )}
           <span className="text-[10px] font-medium">Alerts</span>
         </Link>
-        <Link to="/profile" className={`flex flex-col items-center gap-0.5 ${isActive("/profile") ? "text-t-0" : "text-t-2"}`}>
+        <Link to={`/profile/${user?.id}`} className={`flex flex-col items-center gap-0.5 ${isActive("/profile") ? "text-t-0" : "text-t-2"}`}>
           <User className="h-5 w-5" />
           <span className="text-[10px] font-medium">Profile</span>
         </Link>

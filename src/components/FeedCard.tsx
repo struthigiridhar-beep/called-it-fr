@@ -15,11 +15,13 @@ function getInitials(name: string) {
   return name.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
-export function ChatAvatar({ user }: { user: FeedUser | undefined }) {
+export function ChatAvatar({ user, userId }: { user: FeedUser | undefined; userId?: string }) {
+  const navigate = useNavigate();
   return (
     <div
-      className="h-8 w-8 rounded-full flex items-center justify-center font-bold shrink-0 self-end"
+      className="h-8 w-8 rounded-full flex items-center justify-center font-bold shrink-0 self-end cursor-pointer"
       style={{ backgroundColor: "#272220", color: "#9A8E84", fontSize: 11 }}
+      onClick={(e) => { e.stopPropagation(); if (userId) navigate(`/profile/${userId}`); }}
     >
       {user ? getInitials(user.name) : "??"}
     </div>

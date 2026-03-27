@@ -707,6 +707,7 @@ export default function Group() {
                           <div
                             className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
                             style={{ backgroundColor: entry.avatar_color }}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/profile/${entry.user_id}`); }}
                           >
                             {getInitials(entry.name)}
                           </div>

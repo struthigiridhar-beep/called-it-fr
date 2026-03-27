@@ -38,7 +38,7 @@ const App = () => (
               <Route path="/group/:groupId/judge/:marketId" element={<JudgeVerdict />} />
               <Route path="/group/:groupId/dispute/:disputeId" element={<DisputeRevote />} />
               <Route path="/group/:groupId/roast/:toUserId" element={<RoastComposer />} />
-              <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/:userId" element={<Profile />} />
               <Route path="/notifications" element={<Notifications />} />
             </Route>
             <Route path="*" element={<NotFound />} />
