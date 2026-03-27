@@ -1,71 +1,80 @@
 
 
-## Enhanced Leaderboard with Crew Roles and Dispute Card
+## Chat-Style Feed Redesign
 
-### Overview
-Rebuild the Board tab to match the reference screenshots: rich member rows with crew role badges, streak indicators, accuracy stats, expandable streak history, "most overconfident" tag, active dispute card, and a crew roles explainer accordion.
+Rewrite the feed rendering in two files to match the WhatsApp-style chat layout from the screenshot. No data/hook/routing changes.
 
-### 1. Edge Function: `recompute-crew-roles`
+### Architecture
 
-**New file**: `supabase/functions/recompute-crew-roles/index.ts`
+**FeedCard.tsx** becomes a "bubble renderer" — it returns only the bubble content + sender label + actions row. The outer chat row structure (avatar placement, left/right alignment, timestamp) moves to **Group.tsx**.
 
-Accepts `{ group_id }` (or runs for all groups if none provided). Uses service role key. For each group:
+FeedCard gets a new prop `isSelf: boolean` and exports helper components.
 
-1. Fetch all `group_members` with their `user_id`, `judge_integrity`
-2. For each member, compute:
-   - **Prophetic** (🔮): Query `bets` joined with `verdicts` (committed) — accuracy = wins/total. Min 5 settled bets.
-   - **Wildcard** (🎲): For each bet, check if the member bet against the majority odds (>70% pool on other side). Highest % of such bets.
-   - **HypedUp** (🔥): Count `reactions` where `user_id` = member and `target_type` = 'event' for events in this group.
-   - **Judge** (⚖️): Highest `judge_integrity` with min 2 judge assignments (count from `verdicts`).
-   - **Creator** (🏗️): Count `markets` where `created_by` = member and `group_id` = group.
-3. Assign roles greedily: rank all candidates per role, assign best-fit member to each role (no duplicates). Update `group_members.crew_role`.
+### File 1: `src/components/FeedCard.tsx`
 
-### 2. Trigger recompute from existing flows
+Complete rewrite. The component returns a fragment with three parts that Group.tsx positions:
 
-- In `assign-judge/index.ts`: after assigning judge (verdict committed path), call `recompute-crew-roles` via fetch for that group.
-- Client-side: after creating a market, invoke `recompute-crew-roles` for the group.
-- Cron: add daily cron job calling the function for all groups.
+**A) `SenderLabel` — rendered above bubble**
+- `roast_sent`: `<span style={{color:"#C47860", fontWeight:700}}>{actor}</span> roasted <span style={{color:"#9A8E84", fontWeight:600}}>{target}</span>`
+- `bet_placed`: self → "you placed a bet", other → "{name} placed a bet"
+- `market_created`: "{name} created a market" + inline NEW pill (`bg:#0E1820`, border `#1E3048`, color `#7B9EC8`, 9px, 800 weight)
+- Other types: "{name} {event_type}"
+- All in font-size 12px, color `#5C5248`
 
-### 3. Hook: `useGroupLeaderboard` updates
+**B) `Bubble` — the main content**
+- **Roast**: `bg:#1C0C08`, border `1px solid #3A1810`, border-radius 14px, padding 12px 14px. Text 15px, `#EAE4DC`, italic, weight 500. Decorative quotes in `#C47860`, 20px, bold.
+- **Bet (other)**: `bg:#1E1A17`, border-radius `14px 14px 14px 4px`, padding 11px 13px. YES chip (`bg:#0E1820`, border `#1E3048`, color `#7B9EC8`) or NO chip (`bg:#221410`, border `#442820`, color `#C47860`), 12px bold. Amount monospace `#C8A860` 15px bold. Question 13px `#9A8E84`.
+- **Bet (self)**: `bg:#0F1E10`, border `1px solid #1A3020`, border-radius `14px 14px 4px 14px`. Same inner content.
+- **Market**: Always left-aligned. `bg:#1E1A17`, border-radius 14px, padding 12px 13px. Question 15px bold `#EAE4DC`. YES/NO buttons in flex row, gap 7px, each flex-1, border-radius 9px, padding 9px. YES: `bg:#0E1820` border `#1E3048` color `#7B9EC8`. NO: `bg:#221410` border `#442820` color `#C47860`. Same onYes/onNo handlers.
+- **Other types** (coins_sent, streak, settled, reset): keep current styling but remove outer card wrapper — just the inner content as a bubble with `bg:#1E1A17` border-radius 14px.
 
-Add to the query:
-- `crew_role` from `group_members`
-- Compute **accuracy** per member: fetch all bets for group markets, join with committed verdicts, calculate win%.
-- Compute **bet count** per member
-- Compute **"most overconfident"**: member with most coins bet on losing side across resolved markets
-- Return all in `LeaderboardEntry`
+**C) `ActionsRow` — below bubble**
+- Roast: "🔥 Fire back" pill (left) + reaction chips + add-react (right). Fire back pill: `bg:#1C0906`, border `#38140C`, rounded-full, 12px, `#C47860`, weight 700. Only if isRecipient.
+- Bet (others): reactions left + "🔥 Roast" pill right (`ml-auto`). Same roastLink handler.
+- Bet (self): reactions only, `justify-end`.
+- Market: add-react button only.
 
-### 4. Board Tab UI rebuild (`Group.tsx` board section)
+**Avatar**: 32px circle, `bg:#272220`, initials 11px bold `#9A8E84`. Remove avatar_color usage — uniform dark avatar.
 
-**Header**: "Week [N]" (compute week number from ISO week) + "XP standings · [Group Name]"
+### File 2: `src/pages/Group.tsx` (feed section, lines 549-599)
 
-**Each row** (replace current simple rows):
-- Rank number — gold color (`text-coin`) for #1, muted for rest
-- Avatar circle with initials
-- Name + "(you)" if current user
-- Crew role pill next to name: colored per role (purple/amber/red/green/blue)
-- 🔥 streak badge if streak > 1 (e.g., "🔥 5")
-- Accuracy % as subtitle (e.g., "74% accuracy")
-- XP right-aligned, monospace
-- "Most overconfident" amber pill on qualifying member
-- Tap to expand: show streak history as small pills (gold for active/peak, muted for broken)
+**Day separators** (replace lines 568-571):
+```
+<div className="flex items-center gap-[10px] px-4 py-[10px]">
+  <div className="h-px flex-1 bg-[#1E1A17]" />
+  <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.1em",color:"#3A3230"}} className="uppercase">
+    {dateLabel === "Today" ? "TODAY" : fmtDate(d, "MMM d").toUpperCase()}
+  </span>
+  <div className="h-px flex-1 bg-[#1E1A17]" />
+</div>
+```
 
-**Dispute card** at bottom (if active dispute exists for this group):
-- Red dot + "Verdict disputed" header
-- Market question + judge name
-- Flag progress bar (X / threshold flags)
-- "Coins locked: X c · released on resolution"
-- Countdown timer
+**Feed container**: Remove `space-y-1`. No outer card wrapper per event (remove the `rounded-card border border-b-0 bg-bg-1 p-3` div). Events sit on page bg.
 
-**Crew roles info card**: Collapsible accordion at very bottom, "Crew roles · what do they mean?" — lists all 5 roles with emoji and description in muted text.
+**Each event row** — Group.tsx builds the chat row:
+```
+const isSelf = e.user_id === uid;
+const isRoast = e.event_type === "roast_sent";
+const isMarket = e.event_type === "market_created";
+const alignRight = isSelf && !isRoast && !isMarket;
+```
 
-### 5. No database migration needed
-`crew_role` column already exists on `group_members`. The edge function writes to it with service role key.
+Row structure:
+- `flex items-end gap-2 px-4 mb-[10px]` + `flex-row-reverse` if alignRight
+- Avatar (32px) — `self-end`
+- Content column (`flex-1 min-w-0` + `items-end` if alignRight)
+  - SenderLabel
+  - Bubble
+  - ActionsRow with FeedReactions integrated
+- Timestamp (`text-[10px] font-mono text-[#3E3830] self-end pb-1`) — formatDistanceToNow or time
 
-### Files Modified/Created
-- `supabase/functions/recompute-crew-roles/index.ts` — new edge function
-- `supabase/functions/assign-judge/index.ts` — add recompute trigger call
-- `src/hooks/useGroupLeaderboard.ts` — add crew_role, accuracy, bet counts, overconfident detection
-- `src/pages/Group.tsx` — rebuild board tab section with all UI elements
-- Cron job SQL (via Supabase SQL editor, not migration)
+**FeedReactions** styling update: reaction chips get `bg:#1A1714`, border `#222018`, rounded-full, 12px, color `#9A8E84`. Count monospace `#5C5248`. Add-react button same bg/border, color `#4A4038`.
+
+### Files touched
+- `src/components/FeedCard.tsx` — full rewrite
+- `src/pages/Group.tsx` — lines 549-599 (feed section only)
+- `src/components/FeedReactions.tsx` — styling only (chip colors)
+
+### Not touched
+Data fetching, hooks, Supabase queries, routing, Board tab, Markets tab, bet sheet, roast composer, reaction toggle logic.
 
