@@ -16,7 +16,7 @@ import { useGroupMarkets } from "@/hooks/useGroupMarkets";
 import { useUserBalance } from "@/hooks/useUserBalance";
 import { useJudgeAssignment } from "@/hooks/useJudgeAssignment";
 import { useGroupFeed } from "@/hooks/useGroupFeed";
-import FeedCard from "@/components/FeedCard";
+import { ChatAvatar, SenderLabel, Bubble, ActionsRow } from "@/components/FeedCard";
 import FeedReactions from "@/components/FeedReactions";
 import { isToday, isYesterday, format as fmtDate } from "date-fns";
 import { useGroupLeaderboard, type LeaderboardEntry } from "@/hooks/useGroupLeaderboard";
@@ -547,9 +547,9 @@ export default function Group() {
           )}
 
           {tab === "feed" && (
-            <div className="mt-4 space-y-1">
+            <div className="mt-2">
               {events.length === 0 ? (
-                <p className="text-sm text-t-1">Nothing here yet.</p>
+                <p className="text-sm text-t-1 px-4">Nothing here yet.</p>
               ) : (
                 (() => {
                   let lastDateLabel = "";
@@ -563,39 +563,65 @@ export default function Group() {
                     lastDateLabel = dateLabel;
                     const eventReactions = reactions.filter((r) => r.target_id === e.id);
 
+                    const isSelf = e.user_id === uid;
+                    const isRoast = e.event_type === "roast_sent";
+                    const isMarket = e.event_type === "market_created";
+                    const alignRight = isSelf && !isRoast && !isMarket;
+                    const actor = feedUsersMap.get(e.user_id);
+
+                    const timeStr = d ? fmtDate(d, "h:mm a").toLowerCase() : "";
+
+                    const onYes = (mId: string) => {
+                      const m = [...groupMarkets, ...publicMarkets].find((x) => x.id === mId);
+                      if (m) openSheet(m, "yes");
+                    };
+                    const onNo = (mId: string) => {
+                      const m = [...groupMarkets, ...publicMarkets].find((x) => x.id === mId);
+                      if (m) openSheet(m, "no");
+                    };
+
                     return (
                       <div key={e.id}>
                         {showSeparator && dateLabel && (
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-t-2 pt-4 pb-2">
-                            {dateLabel}
-                          </p>
+                          <div className="flex items-center gap-[10px] px-4 py-[10px]">
+                            <div className="h-px flex-1" style={{ background: "#1E1A17" }} />
+                            <span
+                              className="uppercase"
+                              style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#3A3230" }}
+                            >
+                              {dateLabel === "Today" ? "TODAY" : dateLabel === "Yesterday" ? "YESTERDAY" : fmtDate(d!, "MMM d").toUpperCase()}
+                            </span>
+                            <div className="h-px flex-1" style={{ background: "#1E1A17" }} />
+                          </div>
                         )}
-                        <div className="rounded-card border border-b-0 bg-bg-1 p-3 space-y-2.5">
-                          <FeedCard
-                            event={e}
-                            users={feedUsersMap}
-                            onYes={(mId) => {
-                              const m = [...groupMarkets, ...publicMarkets].find((x) => x.id === mId);
-                              if (m) openSheet(m, "yes");
-                            }}
-                            onNo={(mId) => {
-                              const m = [...groupMarkets, ...publicMarkets].find((x) => x.id === mId);
-                              if (m) openSheet(m, "no");
-                            }}
-                          />
-                          <FeedReactions
-                            eventId={e.id}
-                            groupId={groupId!}
-                            reactions={eventReactions}
-                            userId={uid}
-                          />
+                        <div
+                          className={`flex items-end gap-2 px-4 mb-[10px] ${alignRight ? "flex-row-reverse" : ""}`}
+                        >
+                          <ChatAvatar user={actor} />
+                          <div className={`flex-1 min-w-0 flex flex-col ${alignRight ? "items-end" : "items-start"}`}>
+                            <SenderLabel event={e} users={feedUsersMap} isSelf={isSelf} />
+                            <Bubble event={e} users={feedUsersMap} isSelf={isSelf} onYes={onYes} onNo={onNo} />
+                            <ActionsRow event={e} users={feedUsersMap} isSelf={isSelf}>
+                              <FeedReactions
+                                eventId={e.id}
+                                groupId={groupId!}
+                                reactions={eventReactions}
+                                userId={uid}
+                              />
+                            </ActionsRow>
+                          </div>
+                          <span
+                            className="self-end shrink-0"
+                            style={{ fontSize: 10, fontFamily: "monospace", color: "#3E3830", paddingBottom: 4 }}
+                          >
+                            {timeStr}
+                          </span>
                         </div>
                       </div>
                     );
                   });
                 })()
               )}
-
             </div>
           )}
 
