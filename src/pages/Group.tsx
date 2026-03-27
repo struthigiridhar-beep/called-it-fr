@@ -20,7 +20,12 @@ import FeedCard from "@/components/FeedCard";
 import FeedReactions from "@/components/FeedReactions";
 import { isToday, isYesterday, format as fmtDate } from "date-fns";
 import { useGroupLeaderboard, type LeaderboardEntry } from "@/hooks/useGroupLeaderboard";
+import { useActiveDispute } from "@/hooks/useActiveDispute";
 import { useQuery } from "@tanstack/react-query";
+import { getISOWeek } from "date-fns";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Progress } from "@/components/ui/progress";
+import { ChevronDown } from "lucide-react";
 
 type Tab = "markets" | "feed" | "board" | "create";
 type Side = "yes" | "no";
@@ -88,7 +93,9 @@ export default function Group() {
   const { pendingMarkets: pendingVerdicts } = useJudgeAssignment(groupId, uid);
   const { events, reactions, users: feedUsers } = useGroupFeed(groupId);
   const feedUsersMap = new Map(feedUsers.map((u) => [u.id, u]));
-  const { leaderboard } = useGroupLeaderboard(groupId);
+  const { leaderboard, mostOverconfidentId } = useGroupLeaderboard(groupId);
+  const { activeDispute } = useActiveDispute(groupId);
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
   // User data for first_bet_at
   const { data: userData } = useQuery({
