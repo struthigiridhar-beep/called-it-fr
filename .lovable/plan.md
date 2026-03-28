@@ -1,139 +1,134 @@
 
 
-## Onboarding Flows, Invite System, and Create Group Fix
+## Onboarding Flows, Invite System, and Create/Join Group
 
-This is a large set of changes across 5 fixes. Here is the implementation plan.
+Six changes across 4 new files and 5 modified files.
 
-### Overview
+---
 
-```text
-Cold landing bet → auth overlay → /onboarding/create-group → /onboarding/first-market → /group/:id (invite sheet auto-opens)
-Home + FAB → CreateJoinGroupSheet → create or join → /group/:id (invite sheet auto-opens)
-Group header Invite button → GroupInviteSheet
-/join/:groupId?ref=X&c=Y → referral tracking → reward on first bet
-```
+### FIX 1 — Post-bet auth redirect (Landing.tsx)
 
-### FIX 1 — Post-bet auth on cold landing
+Modify the `useEffect` at line 47 that fires when `user` is set during `step === "auth"`.
 
-**File: `src/pages/Landing.tsx`**
+**Current**: advances to `homescreen-nudge`, `bet-placed`, or `market-live`.
 
-Change the `useEffect` that fires when `user` is set during `step === "auth"`:
-- Instead of advancing to `bet-placed` or `market-live`, redirect to `/onboarding/create-group`
-- Before redirecting, commit the pending bet to Supabase (insert bet row, update market pools, set `first_bet_at` if null)
-- Store pending bet data in localStorage before auth (already partially done) so it survives the auth flow
+**New**: On auth success:
+1. If `pendingBet` exists → commit bet to Supabase (insert bet row, update market pool, set `first_bet_at` if null), clear state
+2. Navigate to `/onboarding/create-group` (regardless of pendingBet or pendingMarket)
+3. Remove the `bet-placed` and `market-live` step branches entirely — those screens are replaced by the onboarding flow
 
-The auth form already exists on this page — no overlay needed, just change the post-auth destination.
+Also update line 63 redirect guard to still send already-authenticated users to `/home`.
 
-### FIX 2 — `/onboarding/create-group`
+The auth form (line 251) stays as-is — it already shows "Save your bet" heading and the pending bet card. Just need to add a "Display name" input field before email, and update button text to "Save my bet & continue →" per the mockup (image-101). On signup, also insert a `users` row with the display name.
 
-**New file: `src/pages/OnboardingCreateGroup.tsx`**
+---
 
-Full-screen page, no BottomNav. Layout matches mockup (image-95):
-- "Called It." wordmark top-left, muted
-- 2-dot progress indicator (dot 1 active in `#7B9EC8`)
-- "Now make it personal." heading
-- "Create a group for your crew..." subtext
-- Group name input with placeholder
-- "You can always rename it later." helper text
-- "Create group →" full-width button at bottom
+### FIX 2 — /onboarding/create-group (new file)
+
+**File**: `src/pages/OnboardingCreateGroup.tsx`
+
+Full-screen, no BottomNav. Matches image-102 exactly:
+- "Called It." wordmark top-left (13px, 700, #4A4038)
+- 2-dot progress indicator (dot 1 = blue #7B9EC8, dot 2 = #2A2420)
+- "Now make it personal." heading (26px, 800, #EAE4DC)
+- "Create a group for your crew — the people you actually want to bet against." subtext
+- Group name input (bg #1E1A17, border #2A2420, rounded-[13px], placeholder "Fantasy F1 league, flat 4, work rivals...")
+- "You can always rename it later." helper text (#4A4038)
+- Bottom-pinned "Create group →" button (bg #EAE4DC, color #100E0C, disabled when empty)
 
 On submit:
-1. Insert `groups` row (name, created_by, is_public=false)
-2. Insert `group_members` row (user_id, group_id, coins=500, xp=0)
-3. Navigate to `/onboarding/first-market?groupId=[id]`
+1. Insert `groups` row → get ID
+2. Insert `group_members` row (coins=500)
+3. Navigate to `/onboarding/first-market?groupId=ID`
 
-**File: `src/App.tsx`** — add route `/onboarding/create-group`
+---
 
-### FIX 3 — `/onboarding/first-market`
+### FIX 3 — /onboarding/first-market (new file)
 
-**New file: `src/pages/OnboardingFirstMarket.tsx`**
+**File**: `src/pages/OnboardingFirstMarket.tsx`
 
-Full-screen, no BottomNav. Layout matches mockup (image-96):
-- Progress indicator (dot 2 active)
+Full-screen, no BottomNav. Matches image-103:
+- Progress dots (dot 1 = green #7AB870 ✓, dot 2 = blue #7B9EC8 active)
 - "Drop the first market." heading
-- Question textarea (120 char max, counter in corner)
-- Suggestion pills that fill the textarea on tap
-- Category chips: Work / Social / Life
-- Deadline chips: 1w / 2w / 1mo / 3mo
-- "Post it →" button
+- "Make it about someone specific. The more real, the better." subtext
+- Question textarea (maxLength 120, char counter "n/120", turns red >100)
+- Suggestion pills (flex-wrap): 6 pre-written suggestions, tapping fills textarea
+- Category chips: Work / Social / Life (single select)
+- Deadline chips in 2 rows: 1h / 6h / 24h / 3d | 1w / 1mo / 6mo / 1yr (default: 1w)
+- "Post it →" button, disabled if question empty
 
 On submit:
-1. Insert `markets` row (group_id from query param, created_by, status=open, deadline computed from chip selection, min_bet=10)
+1. Insert `markets` row (group_id from query param, deadline computed from chip)
 2. Navigate to `/group/:groupId?showInvite=true`
 
-**File: `src/App.tsx`** — add route `/onboarding/first-market`
+---
 
-### FIX 4 — Create or join group from home
+### FIX 4 — Create/Join group sheet (new component)
 
-**New file: `src/components/CreateJoinGroupSheet.tsx`**
+**File**: `src/components/CreateJoinGroupSheet.tsx`
 
-Bottom sheet with two sections matching mockup (image-94):
-- "Create a new group" — name input, "Create →" button
-- "Join with a code" — paste link/code input, "Join group →" button
+Bottom sheet with two sections separated by "or" divider:
+- **Create**: group name input + "Create →" button → insert group + member → navigate to `/group/:id?showInvite=true`
+- **Join**: code/link input + "Join group →" → parse code, validate against `invites` table, insert member (coins=500), navigate to `/group/:id`
 
-Create flow: insert group + member, navigate to `/group/:id?showInvite=true`
+**Home.tsx** (line 268-276): Wire the dashed card `onClick` to open `CreateJoinGroupSheet`. The FAB (line 282) currently opens CreateMarketSheet — keep that behavior since it's for creating markets within an existing group.
 
-Join flow: parse code from input (handle full URL or raw code), validate against `invites` table, increment uses, insert `group_members` (coins=500), navigate to `/group/:id`
+---
 
-**File: `src/pages/Home.tsx`** — wire the dashed card and FAB to open this sheet
+### FIX 5 — Group invite sheet (new component)
 
-### FIX 5 — Invite sheet (GroupInviteSheet)
+**File**: `src/components/GroupInviteSheet.tsx`
 
-**New file: `src/components/GroupInviteSheet.tsx`**
-
-Bottom sheet that calls `supabase.rpc('generate_invite_link', { p_group_id, p_inviter_id })` on open. Layout matches mockup (image-97, image-98):
-
+Bottom sheet matching image-104. On open, calls `supabase.rpc('generate_invite_link', ...)` or creates an invite directly:
 - Group avatar + name + member count
-- Overlapping member avatar circles (first 5)
-- Dynamic headline computed from group data:
-  - If any member has streak >= 3: "[Name] is on a [N]-win streak. Come bet against them."
-  - If settled markets >= 5: "Your friends have called [N] things right."
-  - Default: "Your crew is betting on each other. You're not in it yet."
+- Overlapping member avatars (first 5)
+- Dynamic headline (streak-based, resolved-count-based, or default)
 - First open market card with odds bar
-- Second market blurred with lock icon + "Join to see more"
-- Invite link display with Copy button
-- Three buttons: Share, WhatsApp, Skip for now
+- Second market blurred with 🔒 "Join to see more"
+- Invite link row with Copy button
+- Share / Share on WhatsApp / Skip for now buttons
 
-**File: `src/pages/Group.tsx`**:
-- Add "Invite" button to group header
-- Read `?showInvite=true` query param to auto-open sheet on arrival from onboarding
-- Wire sheet open/close state
+**Group.tsx** modifications:
+- Add "Invite" pill button in the sticky header (line 485-497, next to the coin badge)
+- Add state `inviteSheetOpen` + read `?showInvite=true` on mount → auto-open sheet, clear param via `history.replaceState`
+- Pass group data (members, markets, group info) to the sheet
 
-### FIX 6 — Referral tracking
+Since `generate_invite_link` RPC may not exist yet, the sheet will create an invite directly: `supabase.from('invites').insert({ group_id, created_by }).select('code').single()` and construct the URL as `calledit.app/join/{groupId}?ref={code}`.
 
-**File: `src/pages/JoinGroup.tsx`**:
-- On `/join/:groupId?ref=X&c=Y`, store `{ ref, code, groupId }` in localStorage key `pendingReferral`
-- After auth + join: read localStorage, insert `referrals` row, increment `invites.uses`, clear localStorage
+---
 
-**Referral reward on first bet** — handled via existing `handle_new_bet_event` trigger or a new trigger:
-- Check if user's `first_bet_at` was null, set it
-- Look up `referrals` where `invitee_id = user.id`
-- Credit inviter 50 coins, insert transaction, insert notification
+### FIX 6 — Referral tracking (JoinGroup.tsx)
 
-This reward logic is best done in a new DB trigger `handle_first_bet_referral_reward` on `bets` table since it needs service-level access to update another user's coins.
+On mount at `/join/:groupId?ref=X&c=Y`:
+- Read `ref` and `c` params, store in localStorage key `pendingReferral`
+- After auth + group join (existing useEffect at line 143): read `pendingReferral`, insert `referrals` row, increment `invites.uses`, clear localStorage
 
-**Migration**: Create trigger function that fires on bet insert, checks if user has `first_bet_at IS NULL`, looks up referral, credits inviter.
+SQL trigger for referral reward — included as comment block at bottom of file for manual execution.
 
-### Routes added to `src/App.tsx`
-- `/onboarding/create-group` → OnboardingCreateGroup
-- `/onboarding/first-market` → OnboardingFirstMarket
+---
 
-### Files created
-- `src/pages/OnboardingCreateGroup.tsx`
-- `src/pages/OnboardingFirstMarket.tsx`
-- `src/components/CreateJoinGroupSheet.tsx`
-- `src/components/GroupInviteSheet.tsx`
+### Routing (App.tsx)
 
-### Files modified
-- `src/App.tsx` — new routes
-- `src/pages/Landing.tsx` — post-auth redirect change
-- `src/pages/Home.tsx` — wire create/join sheet
-- `src/pages/Group.tsx` — invite button + auto-open invite sheet
-- `src/pages/JoinGroup.tsx` — referral localStorage tracking
+Add 2 routes inside AuthGuard:
+- `/onboarding/create-group` → `OnboardingCreateGroup`
+- `/onboarding/first-market` → `OnboardingFirstMarket`
 
-### Migration
-- New trigger function `handle_first_bet_referral_reward` on `bets` insert
+---
+
+### Files summary
+
+| Action | File |
+|--------|------|
+| New | `src/pages/OnboardingCreateGroup.tsx` |
+| New | `src/pages/OnboardingFirstMarket.tsx` |
+| New | `src/components/CreateJoinGroupSheet.tsx` |
+| New | `src/components/GroupInviteSheet.tsx` |
+| Modify | `src/App.tsx` — add 2 routes |
+| Modify | `src/pages/Landing.tsx` — auth redirect + display name field |
+| Modify | `src/pages/Home.tsx` — wire create/join sheet |
+| Modify | `src/pages/Group.tsx` — invite button + auto-open sheet |
+| Modify | `src/pages/JoinGroup.tsx` — referral localStorage tracking |
 
 ### Not touched
-Feed layout, Board tab, Markets tab, bet sheet internals, roast composer, judge screen, profile page, notification hooks, existing edge functions.
+Feed layout, Board tab, Markets tab, bet sheet internals, roast composer, judge screen, profile page, notification hooks, existing edge functions, BottomNav.
 
