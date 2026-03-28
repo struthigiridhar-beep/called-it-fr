@@ -31,7 +31,7 @@ export default function OnboardingFirstMarket() {
   const [searchParams] = useSearchParams();
   const groupId = searchParams.get("groupId");
 
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState(searchParams.get("question") || "");
   const [category, setCategory] = useState("Social");
   const [deadline, setDeadline] = useState("1w");
   const [loading, setLoading] = useState(false);
