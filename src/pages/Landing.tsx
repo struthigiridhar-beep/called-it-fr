@@ -43,6 +43,7 @@ export default function Landing() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [displayName, setDisplayName] = useState("");
 
   // On auth: commit pending bet then redirect to onboarding
   useEffect(() => {
@@ -122,7 +123,7 @@ export default function Landing() {
     setAuthLoading(true);
     try {
       if (authMode === "signup") {
-        await signUp(email, password);
+        await signUp(email, password, displayName || undefined);
       } else {
         await signIn(email, password);
       }
@@ -311,19 +312,30 @@ export default function Landing() {
 
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-t-0">
-              {isBetFlow ? "Save your bet." : "One step to go live."}
+              {isBetFlow ? "Save your bet" : "One step to go live."}
             </h1>
             <p className="text-t-1 text-sm">
               {authMode === "signup"
-                ? "Create an account to lock it in."
+                ? pendingBet
+                  ? `Create an account to lock in your ${pendingBet.amount} coin ${pendingBet.side.toUpperCase()} bet.`
+                  : "Create an account to lock it in."
                 : "Sign in to your account."}
             </p>
           </div>
 
           <form onSubmit={handleAuth} className="space-y-3">
+            {authMode === "signup" && (
+              <Input
+                type="text"
+                placeholder="Display name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="h-12 rounded-button bg-bg-2 border-b-0 text-t-0 placeholder:text-t-2"
+              />
+            )}
             <Input
               type="email"
-              placeholder="your@email.com"
+              placeholder="Email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -331,11 +343,11 @@ export default function Landing() {
             />
             <Input
               type="password"
-              placeholder="Password"
+              placeholder="Password (min 8 chars)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={8}
               className="h-12 rounded-button bg-bg-2 border-b-0 text-t-0 placeholder:text-t-2"
             />
             {authError && <p className="text-sm text-no">{authError}</p>}
@@ -347,7 +359,7 @@ export default function Landing() {
               {authLoading
                 ? "Loading…"
                 : authMode === "signup"
-                  ? "Create account"
+                  ? "Save my bet & continue →"
                   : "Sign in"}
             </button>
           </form>
