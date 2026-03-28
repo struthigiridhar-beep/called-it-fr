@@ -950,6 +950,15 @@ export default function Group() {
         </SheetContent>
       </Sheet>
 
+      {groupId && group && (
+        <GroupInviteSheet
+          open={inviteSheetOpen}
+          onOpenChange={setInviteSheetOpen}
+          groupId={groupId}
+          groupName={group.name}
+        />
+      )}
+
       <BottomNav />
     </div>
   );

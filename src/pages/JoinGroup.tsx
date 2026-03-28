@@ -47,8 +47,20 @@ export default function JoinGroup() {
   const { groupId } = useParams<{ groupId: string }>();
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get("ref");
+  const refUserId = searchParams.get("ref");
+  const inviteCodeParam = searchParams.get("c");
   const navigate = useNavigate();
   const { user, signUp, signIn } = useAuth();
+
+  // Store referral info on mount
+  useEffect(() => {
+    if (groupId && refUserId && inviteCodeParam) {
+      localStorage.setItem(
+        "pendingReferral",
+        JSON.stringify({ inviterUserId: refUserId, code: inviteCodeParam, groupId })
+      );
+    }
+  }, [groupId, refUserId, inviteCodeParam]);
 
   const [step, setStep] = useState<Step>("preview");
   const [email, setEmail] = useState("");
@@ -161,6 +173,37 @@ export default function JoinGroup() {
           amount: 50,
           reference_id: user.id,
         });
+      }
+
+      // Track referral
+      try {
+        const raw = localStorage.getItem("pendingReferral");
+        if (raw) {
+          const referral = JSON.parse(raw);
+          if (referral.groupId === groupId) {
+            await supabase.from("referrals").insert({
+              inviter_id: referral.inviterUserId,
+              invitee_id: user.id,
+              group_id: groupId,
+            });
+            if (referral.code) {
+              const { data: inv } = await supabase
+                .from("invites")
+                .select("id, uses")
+                .eq("code", referral.code)
+                .single();
+              if (inv) {
+                await supabase
+                  .from("invites")
+                  .update({ uses: inv.uses + 1 })
+                  .eq("id", inv.id);
+              }
+            }
+            localStorage.removeItem("pendingReferral");
+          }
+        }
+      } catch (err) {
+        console.error("Referral tracking error:", err);
       }
 
       // Place pending bet if exists
