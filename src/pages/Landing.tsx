@@ -76,7 +76,11 @@ export default function Landing() {
             console.error("Failed to commit pending bet:", err);
           }
         }
-        navigate("/onboarding/create-group", { replace: true });
+        const params = new URLSearchParams();
+        if (pendingMarket?.question) params.set("question", pendingMarket.question);
+        if (pendingBet?.question) params.set("question", pendingBet.question);
+        const qs = params.toString();
+        navigate(`/onboarding/create-group${qs ? `?${qs}` : ""}`, { replace: true });
       })();
     }
   }, [user]);
