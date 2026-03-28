@@ -1,5 +1,5 @@
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,8 +10,9 @@ import BetSheet from "@/components/BetSheet";
 import CreateMarketSheet from "@/components/CreateMarketSheet";
 import RevealCeremony from "@/components/RevealCeremony";
 import { toast } from "sonner";
-import { Plus, Flag, AlertTriangle, Gavel } from "lucide-react";
+import { Plus, Flag, AlertTriangle, Gavel, UserPlus } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import GroupInviteSheet from "@/components/GroupInviteSheet";
 import { useGroupMarkets } from "@/hooks/useGroupMarkets";
 import { useUserBalance } from "@/hooks/useUserBalance";
 import { useJudgeAssignment } from "@/hooks/useJudgeAssignment";
@@ -65,6 +66,7 @@ export default function Group() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParamsObj, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>("markets");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMarket, setSheetMarket] = useState<MarketRow | null>(null);
@@ -73,6 +75,15 @@ export default function Group() {
   const [revealMarketId, setRevealMarketId] = useState<string | null>(null);
   const [resolveMarket, setResolveMarket] = useState<MarketRow | null>(null);
   const [resolving, setResolving] = useState(false);
+  const [inviteSheetOpen, setInviteSheetOpen] = useState(false);
+
+  // Auto-open invite sheet from ?showInvite=true
+  useEffect(() => {
+    if (searchParamsObj.get("showInvite") === "true") {
+      setInviteSheetOpen(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [searchParamsObj]);
 
   const uid = user?.id;
   const isAdmin = user?.email === ADMIN_EMAIL;
@@ -483,6 +494,14 @@ export default function Group() {
             ))}
 
             <div className="ml-auto flex items-center gap-3 pb-2.5">
+              <button
+                onClick={() => setInviteSheetOpen(true)}
+                className="flex items-center gap-1 rounded-full border px-3 py-1 text-xs text-t-1"
+                style={{ background: "#1E1A17", borderColor: "#2A2420" }}
+              >
+                <UserPlus className="h-3 w-3" />
+                Invite
+              </button>
               <div className="flex items-center gap-1.5 rounded-pill bg-coin-bg border border-coin-border px-3 py-1">
                 <span className="text-sm font-bold font-mono-num text-coin">{userCoins.toLocaleString()}</span>
                 <span className="text-xs text-coin">c</span>
@@ -930,6 +949,15 @@ export default function Group() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {groupId && group && (
+        <GroupInviteSheet
+          open={inviteSheetOpen}
+          onOpenChange={setInviteSheetOpen}
+          groupId={groupId}
+          groupName={group.name}
+        />
+      )}
 
       <BottomNav />
     </div>

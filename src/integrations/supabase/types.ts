@@ -733,6 +733,10 @@ export type Database = {
         Args: { _user_id: string; _verdict_id: string }
         Returns: Json
       }
+      generate_invite_link: {
+        Args: { p_group_id: string; p_inviter_id: string }
+        Returns: string
+      }
       resolve_market: {
         Args: { _judge_id: string; _market_id: string }
         Returns: undefined

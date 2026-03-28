@@ -5,6 +5,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import CreateMarketSheet from "@/components/CreateMarketSheet";
+import CreateJoinGroupSheet from "@/components/CreateJoinGroupSheet";
 import { useState } from "react";
 import { usePublicBets } from "@/hooks/usePublicBets";
 import OddsBar from "@/components/OddsBar";
@@ -38,6 +39,7 @@ export default function Home() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createGroupId, setCreateGroupId] = useState<string | null>(null);
   const [createGroupName, setCreateGroupName] = useState("");
+  const [joinSheetOpen, setJoinSheetOpen] = useState(false);
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ["home-groups", user?.id],
     enabled: !!user?.id,
@@ -266,7 +268,7 @@ export default function Home() {
 
           {/* Create / join group CTA */}
           <button
-            onClick={() => {/* TODO: create/join modal */}}
+            onClick={() => setJoinSheetOpen(true)}
             className="w-full rounded-card border border-dashed border-b-1 bg-transparent px-4 py-5 flex items-center gap-3 text-t-2 active:scale-[0.98] transition-transform"
           >
             <div className="h-10 w-10 rounded-full border border-dashed border-b-1 flex items-center justify-center shrink-0">
@@ -300,6 +302,7 @@ export default function Home() {
         />
       )}
 
+      <CreateJoinGroupSheet open={joinSheetOpen} onOpenChange={setJoinSheetOpen} />
       <BottomNav />
     </div>
   );

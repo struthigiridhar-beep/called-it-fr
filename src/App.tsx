@@ -13,6 +13,8 @@ import JudgeVerdict from "@/pages/JudgeVerdict";
 import DisputeRevote from "@/pages/DisputeRevote";
 import RoastComposer from "@/pages/RoastComposer";
 
+import OnboardingCreateGroup from "@/pages/OnboardingCreateGroup";
+import OnboardingFirstMarket from "@/pages/OnboardingFirstMarket";
 import Profile from "@/pages/Profile";
 import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
@@ -34,6 +36,8 @@ const App = () => (
 
               {/* Protected routes */}
               <Route path="/home" element={<Home />} />
+              <Route path="/onboarding/create-group" element={<OnboardingCreateGroup />} />
+              <Route path="/onboarding/first-market" element={<OnboardingFirstMarket />} />
               <Route path="/group/:groupId" element={<Group />} />
               <Route path="/group/:groupId/judge/:marketId" element={<JudgeVerdict />} />
               <Route path="/group/:groupId/dispute/:disputeId" element={<DisputeRevote />} />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { useFeaturedMarket } from "@/hooks/useFeaturedMarket";
 import MarketCard from "@/components/MarketCard";
 import BetSheet from "@/components/BetSheet";
@@ -43,24 +44,44 @@ export default function Landing() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
-  // On auth: if user becomes authenticated while on auth step, advance
+  // On auth: commit pending bet then redirect to onboarding
   useEffect(() => {
     if (!user) return;
     if (step === "auth") {
-      if (shouldShowNudge()) {
-        setStep("homescreen-nudge");
-      } else if (pendingBet) {
-        setStep("bet-placed");
-      } else if (pendingMarket) {
-        setStep("market-live");
-      } else {
-        navigate("/home", { replace: true });
-      }
+      (async () => {
+        if (pendingBet && market) {
+          // Commit pending bet
+          try {
+            await supabase.from("bets").insert({
+              market_id: pendingBet.marketId,
+              user_id: user.id,
+              side: pendingBet.side,
+              amount: pendingBet.amount,
+            });
+
+            const poolCol = pendingBet.side === "yes" ? "yes_pool" : "no_pool";
+            const currentPool = pendingBet.side === "yes" ? market.yes_pool : market.no_pool;
+            await supabase
+              .from("markets")
+              .update({ [poolCol]: currentPool + pendingBet.amount })
+              .eq("id", pendingBet.marketId);
+
+            await supabase
+              .from("users")
+              .update({ first_bet_at: new Date().toISOString() })
+              .eq("id", user.id)
+              .is("first_bet_at", null);
+          } catch (err) {
+            console.error("Failed to commit pending bet:", err);
+          }
+        }
+        navigate("/onboarding/create-group", { replace: true });
+      })();
     }
   }, [user]);
 
   // Redirect authenticated users with no pending actions
-  if (user && !["bet-placed", "market-live", "auth", "homescreen-nudge"].includes(step)) {
+  if (user && !["auth"].includes(step)) {
     return <Navigate to="/home" replace />;
   }
 

@@ -47,8 +47,20 @@ export default function JoinGroup() {
   const { groupId } = useParams<{ groupId: string }>();
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get("ref");
+  const refUserId = searchParams.get("ref");
+  const inviteCodeParam = searchParams.get("c");
   const navigate = useNavigate();
   const { user, signUp, signIn } = useAuth();
+
+  // Store referral info on mount
+  useEffect(() => {
+    if (groupId && refUserId && inviteCodeParam) {
+      localStorage.setItem(
+        "pendingReferral",
+        JSON.stringify({ inviterUserId: refUserId, code: inviteCodeParam, groupId })
+      );
+    }
+  }, [groupId, refUserId, inviteCodeParam]);
 
   const [step, setStep] = useState<Step>("preview");
   const [email, setEmail] = useState("");
@@ -161,6 +173,37 @@ export default function JoinGroup() {
           amount: 50,
           reference_id: user.id,
         });
+      }
+
+      // Track referral
+      try {
+        const raw = localStorage.getItem("pendingReferral");
+        if (raw) {
+          const referral = JSON.parse(raw);
+          if (referral.groupId === groupId) {
+            await supabase.from("referrals").insert({
+              inviter_id: referral.inviterUserId,
+              invitee_id: user.id,
+              group_id: groupId,
+            });
+            if (referral.code) {
+              const { data: inv } = await supabase
+                .from("invites")
+                .select("id, uses")
+                .eq("code", referral.code)
+                .single();
+              if (inv) {
+                await supabase
+                  .from("invites")
+                  .update({ uses: inv.uses + 1 })
+                  .eq("id", inv.id);
+              }
+            }
+            localStorage.removeItem("pendingReferral");
+          }
+        }
+      } catch (err) {
+        console.error("Referral tracking error:", err);
       }
 
       // Place pending bet if exists
@@ -580,3 +623,70 @@ export default function JoinGroup() {
     </div>
   );
 }
+
+/*
+  Run in Supabase SQL editor — referral reward trigger
+
+  CREATE OR REPLACE FUNCTION handle_first_bet_referral_reward()
+  RETURNS trigger AS $$
+  DECLARE
+    v_inviter_id uuid;
+    v_current_coins integer;
+  BEGIN
+    -- Only fire on first bet (first_bet_at is null)
+    IF (SELECT first_bet_at FROM users WHERE id = NEW.user_id) IS NOT NULL THEN
+      RETURN NEW;
+    END IF;
+
+    -- Set first_bet_at
+    UPDATE users SET first_bet_at = now() WHERE id = NEW.user_id;
+
+    -- Find referral
+    SELECT inviter_id INTO v_inviter_id
+    FROM referrals WHERE invitee_id = NEW.user_id LIMIT 1;
+
+    IF v_inviter_id IS NULL THEN
+      RETURN NEW;
+    END IF;
+
+    -- Credit inviter 50 coins in their most active group
+    SELECT coins INTO v_current_coins
+    FROM group_members
+    WHERE user_id = v_inviter_id
+    ORDER BY xp DESC LIMIT 1;
+
+    UPDATE group_members
+    SET coins = v_current_coins + 50
+    WHERE user_id = v_inviter_id
+    AND group_id = (
+      SELECT group_id FROM group_members
+      WHERE user_id = v_inviter_id
+      ORDER BY xp DESC LIMIT 1
+    );
+
+    -- Insert transaction record
+    INSERT INTO transactions (user_id, type, amount, reference_id)
+    VALUES (v_inviter_id, 'bonus', 50, NEW.id);
+
+    -- Insert notification for inviter
+    INSERT INTO notifications (user_id, type, payload, read)
+    VALUES (
+      v_inviter_id,
+      'referral_reward',
+      jsonb_build_object(
+        'invitee_id', NEW.user_id,
+        'coins', 50,
+        'message', 'Your invite paid off — +50 coins'
+      ),
+      false
+    );
+
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+  DROP TRIGGER IF EXISTS on_first_bet_referral_reward ON bets;
+  CREATE TRIGGER on_first_bet_referral_reward
+    AFTER INSERT ON bets
+    FOR EACH ROW EXECUTE FUNCTION handle_first_bet_referral_reward();
+*/
