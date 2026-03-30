@@ -67,7 +67,7 @@ export default function Group() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParamsObj, setSearchParams] = useSearchParams();
-  const [tab, setTab] = useState<Tab>("markets");
+  const [tab, setTab] = useState<Tab>((searchParamsObj.get("tab") as Tab) || "markets"
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMarket, setSheetMarket] = useState<MarketRow | null>(null);
   const [sheetSide, setSheetSide] = useState<Side>("yes");
@@ -568,7 +568,12 @@ export default function Group() {
           {tab === "feed" && (
             <div className="mt-2">
               {events.length === 0 ? (
-                <p className="text-sm text-t-1 px-4">Nothing here yet.</p>
+               <div className="flex flex-col items-center text-center px-6 pt-10 space-y-4">
+  <span className="text-3xl">👀</span>
+  <p className="text-t-0 font-semibold text-[15px]">Nothing yet.</p>
+  <p className="text-t-1 text-sm leading-relaxed max-w-xs">Invite your crew — the feed gets interesting once people start betting against each other.</p>
+  <button onClick={() => setInviteSheetOpen(true)} className="h-10 px-5 rounded-button bg-yes text-white text-sm font-semibold active:scale-[0.97] transition-all">Invite crew →</button>
+</div>
               ) : (
                 (() => {
                   let lastDateLabel = "";
