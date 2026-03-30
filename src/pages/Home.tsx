@@ -5,7 +5,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import CreateMarketSheet from "@/components/CreateMarketSheet";
-import CreateJoinGroupSheet from "@/components/CreateJoinGroupSheet";
 import { useState } from "react";
 import { usePublicBets } from "@/hooks/usePublicBets";
 import OddsBar from "@/components/OddsBar";
@@ -39,7 +38,6 @@ export default function Home() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createGroupId, setCreateGroupId] = useState<string | null>(null);
   const [createGroupName, setCreateGroupName] = useState("");
-  const [joinSheetOpen, setJoinSheetOpen] = useState(false);
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ["home-groups", user?.id],
     enabled: !!user?.id,
