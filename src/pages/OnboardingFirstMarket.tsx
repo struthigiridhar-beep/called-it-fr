@@ -59,7 +59,7 @@ export default function OnboardingFirstMarket() {
         is_pinned: false,
       });
 
-      navigate(`/group/${groupId}?showInvite=true`);
+      navigate(`/group/${groupId}?tab=feed&showInvite=true`);
     } catch (err) {
       console.error(err);
     } finally {
