@@ -76,10 +76,15 @@ export default function Group() {
   const [resolveMarket, setResolveMarket] = useState<MarketRow | null>(null);
   const [resolving, setResolving] = useState(false);
   const [inviteSheetOpen, setInviteSheetOpen] = useState(false);
+  const [seedQuestion, setSeedQuestion] = useState("");
 
-  // Auto-open invite sheet from ?showInvite=true
   useEffect(() => {
     if (searchParamsObj.get("showInvite") === "true") {
+      const seed = searchParamsObj.get("seedQuestion");
+      if (seed) {
+        setSeedQuestion(decodeURIComponent(seed));
+        setCreateOpen(true);
+      }
       setInviteSheetOpen(true);
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -899,9 +904,10 @@ export default function Group() {
 
       <CreateMarketSheet
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(o) => { setCreateOpen(o); if (!o) setSeedQuestion(""); }}
         groupId={groupId!}
         groupName={group?.name ?? "Group"}
+        seedQuestion={seedQuestion}
       />
 
       {revealMarketId && (
