@@ -23,29 +23,24 @@ export default function OnboardingCreateGroup() {
     setLoading(true);
     setError("");
     try {
-      const { data, error: insertError } = await supabase
-        .from("groups")
-        .insert({ name: name.trim(), created_by: user.id, is_public: false })
-        .select("id")
-        .single();
-      if (insertError) throw insertError;
+      const { data: rpcData, error: rpcError } = await (supabase.rpc as any)(
+        "create_group_for_user",
+        { p_name: name.trim(), p_user_id: user.id }
+      );
+      if (rpcError) throw rpcError;
+      const groupId = (rpcData as any).group_id;
 
-      await supabase.from("group_members").insert({
-        user_id: user.id,
-        group_id: data.id,
-        coins: 500,
-        xp: 0,
-        streak: 0,
-        judge_integrity: 1,
-      });
-
-      if (passedQuestion) {
-        // Flow B: had a custom question → go create the market
-        const params = new URLSearchParams({ groupId: data.id, question: passedQuestion });
-        navigate(`/onboarding/first-market?${params.toString()}`);
+      if (passedQuestion && from !== "home") {
+        // Flow B: custom question → open CreateMarketSheet pre-filled, then invite drawer
+        navigate(
+          `/group/${groupId}?tab=feed&showInvite=true&seedQuestion=${encodeURIComponent(passedQuestion)}`
+        );
+      } else if (!passedQuestion && from !== "home") {
+        // Flow A: no custom question (came from bet on public market) → go create a group market first
+        navigate(`/onboarding/first-market?groupId=${groupId}`);
       } else {
-        // Flow A + from=home: no pending question → skip market creation, go straight to group
-        navigate(`/group/${data.id}?tab=feed&showInvite=true`);
+        // from=home: skip market creation, straight to group
+        navigate(`/group/${groupId}?tab=feed&showInvite=true`);
       }
     } catch (err: any) {
       console.error(err);
