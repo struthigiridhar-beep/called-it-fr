@@ -48,41 +48,44 @@ export default function Landing() {
   // On auth: commit pending bet then redirect to onboarding
   useEffect(() => {
     if (!user) return;
-    if (step === "auth") {
-      (async () => {
-        if (pendingBet && market) {
-          // Commit pending bet
-          try {
-            await supabase.from("bets").insert({
-              market_id: pendingBet.marketId,
-              user_id: user.id,
-              side: pendingBet.side,
-              amount: pendingBet.amount,
-            });
-
-            const poolCol = pendingBet.side === "yes" ? "yes_pool" : "no_pool";
-            const currentPool = pendingBet.side === "yes" ? market.yes_pool : market.no_pool;
-            await supabase
-              .from("markets")
-              .update({ [poolCol]: currentPool + pendingBet.amount })
-              .eq("id", pendingBet.marketId);
-
-            await supabase
-              .from("users")
-              .update({ first_bet_at: new Date().toISOString() })
-              .eq("id", user.id)
-              .is("first_bet_at", null);
-          } catch (err) {
-            console.error("Failed to commit pending bet:", err);
-          }
+    if (step !== "auth") return;
+    (async () => {
+      // Flow A: user placed a bet on the featured public market
+      if (pendingBet && market) {
+        try {
+          await supabase.from("bets").insert({
+            market_id: pendingBet.marketId,
+            user_id: user.id,
+            side: pendingBet.side,
+            amount: pendingBet.amount,
+          });
+          const poolCol = pendingBet.side === "yes" ? "yes_pool" : "no_pool";
+          const currentPool = pendingBet.side === "yes" ? market.yes_pool : market.no_pool;
+          await supabase
+            .from("markets")
+            .update({ [poolCol]: currentPool + pendingBet.amount })
+            .eq("id", pendingBet.marketId);
+          await supabase
+            .from("users")
+            .update({ first_bet_at: new Date().toISOString() })
+            .eq("id", user.id)
+            .is("first_bet_at", null);
+        } catch (err) {
+          console.error("Failed to commit pending bet:", err);
         }
-        const params = new URLSearchParams();
-        if (pendingMarket?.question) params.set("question", pendingMarket.question);
-        if (pendingBet?.question) params.set("question", pendingBet.question);
-        const qs = params.toString();
-        navigate(`/onboarding/create-group${qs ? `?${qs}` : ""}`, { replace: true });
-      })();
-    }
+        // Go to create group — no question param, Flow A will go to OnboardingFirstMarket after group creation
+        navigate(`/onboarding/create-group`, { replace: true });
+      } else if (pendingMarket?.question) {
+        // Flow B: user wrote a custom question — pass it through to pre-fill CreateMarketSheet
+        navigate(
+          `/onboarding/create-group?question=${encodeURIComponent(pendingMarket.question)}`,
+          { replace: true }
+        );
+      } else {
+        // Flow C: plain sign-in, nothing pending
+        navigate("/home", { replace: true });
+      }
+    })();
   }, [user]);
 
   // Redirect authenticated users with no pending actions
