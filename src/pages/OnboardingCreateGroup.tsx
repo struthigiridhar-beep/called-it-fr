@@ -39,12 +39,13 @@ export default function OnboardingCreateGroup() {
         judge_integrity: 1,
       });
 
-      if (fromHome) {
-        navigate(`/group/${data.id}?tab=feed&showInvite=true`);
-      } else {
-        const params = new URLSearchParams({ groupId: data.id });
-        if (passedQuestion) params.set("question", passedQuestion);
+      if (passedQuestion) {
+        // Flow B: had a custom question → go create the market
+        const params = new URLSearchParams({ groupId: data.id, question: passedQuestion });
         navigate(`/onboarding/first-market?${params.toString()}`);
+      } else {
+        // Flow A + from=home: no pending question → skip market creation, go straight to group
+        navigate(`/group/${data.id}?tab=feed&showInvite=true`);
       }
     } catch (err: any) {
       console.error(err);
