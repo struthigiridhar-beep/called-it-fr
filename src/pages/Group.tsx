@@ -67,7 +67,7 @@ export default function Group() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParamsObj, setSearchParams] = useSearchParams();
-  const [tab, setTab] = useState<Tab>((searchParamsObj.get("tab") as Tab) || "markets"
+  const [tab, setTab] = useState<Tab>((searchParamsObj.get("tab") as Tab) || "markets");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMarket, setSheetMarket] = useState<MarketRow | null>(null);
   const [sheetSide, setSheetSide] = useState<Side>("yes");
