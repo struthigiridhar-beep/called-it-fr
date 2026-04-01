@@ -30,18 +30,14 @@ export default function OnboardingCreateGroup() {
       if (rpcError) throw rpcError;
       const groupId = (rpcData as any).group_id;
 
-      if (passedQuestion && from !== "home") {
-        // Flow B: custom question → open CreateMarketSheet pre-filled, then invite drawer
-        navigate(
-          `/group/${groupId}?tab=feed&showInvite=true&seedQuestion=${encodeURIComponent(passedQuestion)}`
-        );
-      } else if (!passedQuestion && from !== "home") {
-        // Flow A: no custom question (came from bet on public market) → go create a group market first
-        navigate(`/onboarding/first-market?groupId=${groupId}`);
-      } else {
-        // from=home: skip market creation, straight to group
-        navigate(`/group/${groupId}?tab=feed&showInvite=true`);
-      }
+      // AFTER (fixed)
+if (passedQuestion && !fromHome) {
+  navigate(`/group/${groupId}?tab=feed&showInvite=true&seedQuestion=${encodeURIComponent(passedQuestion)}`);
+} else if (!passedQuestion && !fromHome) {
+  navigate(`/onboarding/first-market?groupId=${groupId}`);
+} else {
+  navigate(`/group/${groupId}?tab=feed&showInvite=true`);
+}
     } catch (err: any) {
       console.error(err);
       setError(err.message ?? "Something went wrong. Try again.");
