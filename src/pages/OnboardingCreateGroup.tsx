@@ -30,7 +30,7 @@ export default function OnboardingCreateGroup() {
       if (rpcError) throw rpcError;
       const groupId = (rpcData as any).group_id;
 
-      // AFTER (fixed)
+
 if (passedQuestion && !fromHome) {
   navigate(`/group/${groupId}?tab=feed&showInvite=true&seedQuestion=${encodeURIComponent(passedQuestion)}`);
 } else if (!passedQuestion && !fromHome) {
