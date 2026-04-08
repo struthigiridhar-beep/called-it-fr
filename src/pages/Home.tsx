@@ -266,7 +266,7 @@ export default function Home() {
 
           {/* Create / join group CTA */}
           <button
-            onClick={() => onClick={() => navigate('/onboarding/create-group?from=home')}
+            onClick={() => navigate('/onboarding/create-group?from=home')}
             className="w-full rounded-card border border-dashed border-b-1 bg-transparent px-4 py-5 flex items-center gap-3 text-t-2 active:scale-[0.98] transition-transform"
           >
             <div className="h-10 w-10 rounded-full border border-dashed border-b-1 flex items-center justify-center shrink-0">
