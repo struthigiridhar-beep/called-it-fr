@@ -82,8 +82,9 @@ useEffect(() => {
   if (searchParamsObj.get("showInvite") === "true") {
     const seed = searchParamsObj.get("seedQuestion");
     if (seed) {
-      setSeedQuestion(decodeURIComponent(seed));
-    }
+  setSeedQuestion(decodeURIComponent(seed));
+  // nothing else — user taps Create whenever they're ready
+}
     setInviteSheetOpen(true);
     window.history.replaceState({}, "", window.location.pathname);
   }
