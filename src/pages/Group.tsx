@@ -78,17 +78,16 @@ export default function Group() {
   const [inviteSheetOpen, setInviteSheetOpen] = useState(false);
   const [seedQuestion, setSeedQuestion] = useState("");
 
-  useEffect(() => {
-    if (searchParamsObj.get("showInvite") === "true") {
-      const seed = searchParamsObj.get("seedQuestion");
-      if (seed) {
-        setSeedQuestion(decodeURIComponent(seed));
-        setCreateOpen(true);
-      }
-      setInviteSheetOpen(true);
-      window.history.replaceState({}, "", window.location.pathname);
+useEffect(() => {
+  if (searchParamsObj.get("showInvite") === "true") {
+    const seed = searchParamsObj.get("seedQuestion");
+    if (seed) {
+      setSeedQuestion(decodeURIComponent(seed));
     }
-  }, [searchParamsObj]);
+    setInviteSheetOpen(true);
+    window.history.replaceState({}, "", window.location.pathname);
+  }
+}, [searchParamsObj]);
 
   const uid = user?.id;
   const isAdmin = user?.email === ADMIN_EMAIL;
