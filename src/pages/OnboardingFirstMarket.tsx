@@ -4,12 +4,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 const SUGGESTIONS = [
-  "Will [Name] quit before Q3?",
-  "Does [Name] make it to the gym 3× this week?",
-  "Will the launch actually ship on time?",
-  "Does [Name] reply within 5 minutes?",
-  "Will [Name] cancel last minute?",
-  "Does [Name] ask them out this month?",
+  "Will [Name] drop their papers this week?",
+  "Does [Name] finally make it to the gym 3× this week?",
+  "Will [Name] lash out at their ex this week",
+  "Does [Name] miss their tax deadline?",
 ];
 
 const CATEGORIES = ["Work", "Social", "Life"];
@@ -35,6 +33,8 @@ export default function OnboardingFirstMarket() {
   const [category, setCategory] = useState("Social");
   const [deadline, setDeadline] = useState("1w");
   const [loading, setLoading] = useState(false);
+  const [customDate, setCustomDate] = useState("");
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
 
   const charCount = question.length;
 
@@ -42,8 +42,13 @@ export default function OnboardingFirstMarket() {
     if (!question.trim() || !groupId || !user) return;
     setLoading(true);
     try {
-      const hours = DEADLINES.find((d) => d.label === deadline)?.hours ?? 168;
-      const deadlineDate = new Date(Date.now() + hours * 60 * 60 * 1000);
+      let deadlineDate: Date;
+      if (showCustomPicker && customDate) {
+        deadlineDate = new Date(customDate + "T23:59:59");
+      } else {
+        const hours = DEADLINES.find((d) => d.label === deadline)?.hours ?? 168;
+        deadlineDate = new Date(Date.now() + hours * 60 * 60 * 1000);
+      }
 
       await supabase.from("markets").insert({
         group_id: groupId,
@@ -154,13 +159,36 @@ export default function OnboardingFirstMarket() {
             {DEADLINES.map((d) => (
               <button
                 key={d.label}
-                onClick={() => setDeadline(d.label)}
-                className={`${chipBase} ${deadline === d.label ? chipOn : chipOff}`}
+                onClick={() => {
+                  setDeadline(d.label);
+                  setShowCustomPicker(false);
+                  setCustomDate("");
+                }}
+                className={`${chipBase} ${deadline === d.label && !showCustomPicker ? chipOn : chipOff}`}
               >
                 {d.label}
               </button>
             ))}
+            <button
+              onClick={() => {
+                setShowCustomPicker(true);
+                setDeadline("");
+              }}
+              className={`${chipBase} ${showCustomPicker ? chipOn : chipOff}`}
+            >
+              custom
+            </button>
           </div>
+          {showCustomPicker && (
+            <input
+              type="date"
+              value={customDate}
+              min={new Date(Date.now() + 3600000).toISOString().split("T")[0]}
+              onChange={(e) => setCustomDate(e.target.value)}
+              className="mt-2 w-full rounded-[13px] border px-4 py-3 text-sm text-t-0 outline-none"
+              style={{ background: "#1E1A17", borderColor: "#4A4038" }}
+            />
+          )}
         </div>
       </div>
 
@@ -168,7 +196,7 @@ export default function OnboardingFirstMarket() {
       <div className="pt-4">
         <button
           onClick={handleSubmit}
-          disabled={!question.trim() || loading}
+          disabled={!question.trim() || loading || (showCustomPicker && !customDate)}
           className="w-full rounded-[13px] py-[15px] text-base font-extrabold transition-all active:scale-[0.97] disabled:opacity-35 disabled:pointer-events-none"
           style={{
             background: "#EAE4DC",
