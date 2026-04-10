@@ -75,7 +75,7 @@ if (fromHome) {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Fantasy F1 league, flat 4, work rivals..."
+            placeholder="Broskis, GossBuddies..."
             className="w-full rounded-[13px] border px-4 py-3.5 text-base text-t-0 outline-none ring-0 focus:ring-0 focus:outline-none placeholder:text-t-2"
             style={{
               background: "#1E1A17",
