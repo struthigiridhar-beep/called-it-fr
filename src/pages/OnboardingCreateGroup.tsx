@@ -31,12 +31,14 @@ export default function OnboardingCreateGroup() {
       const groupId = (rpcData as any).group_id;
 
 
-if (passedQuestion && !fromHome) {
-  navigate(`/group/${groupId}?tab=feed&showInvite=true&seedQuestion=${encodeURIComponent(passedQuestion)}`);
-} else if (!passedQuestion && !fromHome) {
-  navigate(`/onboarding/first-market?groupId=${groupId}`);
-} else {
+if (fromHome) {
   navigate(`/group/${groupId}?tab=feed&showInvite=true`);
+} else {
+  // Always go through OnboardingFirstMarket — pass the question if one exists
+  const questionParam = passedQuestion
+    ? `&question=${encodeURIComponent(passedQuestion)}`
+    : "";
+  navigate(`/onboarding/first-market?groupId=${groupId}${questionParam}`);
 }
     } catch (err: any) {
       console.error(err);
