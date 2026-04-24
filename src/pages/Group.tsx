@@ -78,17 +78,17 @@ export default function Group() {
   const [inviteSheetOpen, setInviteSheetOpen] = useState(false);
   const [seedQuestion, setSeedQuestion] = useState("");
 
-useEffect(() => {
-  if (searchParamsObj.get("showInvite") === "true") {
-    const seed = searchParamsObj.get("seedQuestion");
-    if (seed) {
-  setSeedQuestion(decodeURIComponent(seed));
-  // nothing else — user taps Create whenever they're ready
-}
-    setInviteSheetOpen(true);
-    window.history.replaceState({}, "", window.location.pathname);
-  }
-}, [searchParamsObj]);
+  useEffect(() => {
+    if (searchParamsObj.get("showInvite") === "true") {
+      const seed = searchParamsObj.get("seedQuestion");
+      if (seed) {
+        setSeedQuestion(decodeURIComponent(seed));
+        // nothing else — user taps Create whenever they're ready
+      }
+      setInviteSheetOpen(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [searchParamsObj]);
 
   const uid = user?.id;
   const isAdmin = user?.email === ADMIN_EMAIL;
@@ -177,7 +177,6 @@ useEffect(() => {
 
   const confirmBet = async (side: Side, amount: number) => {
     if (!sheetMarket || !uid) return;
-
     const existingPosition = betsByMarket.get(sheetMarket.id);
     if (existingPosition && existingPosition.side !== side) {
       toast.error(`You already bet ${existingPosition.side.toUpperCase()}. You can only top up.`);
